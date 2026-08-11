@@ -1,0 +1,83 @@
+package myscanne.com;
+
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.View;
+import android.widget.TextView;
+
+/**
+ * Runtime theming helpers. The XML layouts reference fixed @color resources,
+ * so these helpers re-tint the important views/drawables using the palette the
+ * user picked in Settings. Java 7 – no lambdas.
+ */
+public class Theme {
+
+    private static int dp(Context c, int v) {
+        return (int) (v * c.getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /** A card-style rounded background (fill + stroke). */
+    public static GradientDrawable card(Context c) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Prefs.card(c));
+        g.setCornerRadius(dp(c, 12));
+        g.setStroke(dp(c, 1), Prefs.stroke(c));
+        return g;
+    }
+
+    /** An input-style rounded background (slightly darker fill). */
+    public static GradientDrawable input(Context c) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(darken(Prefs.card(c), 0.35f));
+        g.setCornerRadius(dp(c, 8));
+        g.setStroke(dp(c, 1), Prefs.stroke(c));
+        return g;
+    }
+
+    /** A filled button using the accent (or any) color. */
+    public static GradientDrawable filled(Context c, int color) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(c, 10));
+        return g;
+    }
+
+    /** An outlined button using the given stroke color. */
+    public static GradientDrawable outline(Context c, int strokeColor) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.TRANSPARENT);
+        g.setCornerRadius(dp(c, 10));
+        g.setStroke(dp(c, 1), strokeColor);
+        return g;
+    }
+
+    /** A small pill (used for tabs / swatches). */
+    public static GradientDrawable pill(Context c, int fill, int strokeColor) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(fill);
+        g.setCornerRadius(dp(c, 999));
+        g.setStroke(dp(c, 1), strokeColor);
+        return g;
+    }
+
+    public static void applyFont(Context c, TextView tv, int style) {
+        if (Prefs.isSans(c)) tv.setTypeface(Typeface.SANS_SERIF, style);
+        else tv.setTypeface(Typeface.MONOSPACE, style);
+    }
+
+    /** Mix a color toward black by the given ratio (0..1). */
+    public static int darken(int color, float ratio) {
+        int r = (int) (Color.red(color) * (1 - ratio));
+        int g = (int) (Color.green(color) * (1 - ratio));
+        int b = (int) (Color.blue(color) * (1 - ratio));
+        return Color.rgb(r, g, b);
+    }
+
+    /** Pick readable text (near-black or near-white) for a given background. */
+    public static int onColor(int bg) {
+        double lum = (0.299 * Color.red(bg) + 0.587 * Color.green(bg) + 0.114 * Color.blue(bg)) / 255.0;
+        return lum > 0.6 ? 0xFF0D0F14 : 0xFFFFFFFF;
+    }
+}
