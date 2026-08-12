@@ -6,10 +6,9 @@ import java.util.List;
 
 public class Prefs {
     private static final String F="ui_prefs";
-    private static final String K_T="theme",K_FNT="font",K_D="density",K_M="menu",K_TO="to",K_P="ports",K_MTD="mtd",K_TH="th";
+    private static final String K_T="theme",K_FNT="font",K_D="density",K_M="menu",K_TO="to",K_P="ports",K_MTD="mtd",K_TH="th",K_UA="ua";
 
     public static final String[] TN={"Crimson Dark","Ocean Dark","Emerald Dark","Amber Dark","Violet Dark","AMOLED","B&W Light","Purple Light","Daylight"};
-    // bg,card,stroke,accent,info,text,muted,isLight
     private static final int[][] TC={
         {0xFF0D0F14,0xFF161A22,0xFF232A36,0xFFFF3B4E,0xFF3D8BFF,0xFFF2F5FA,0xFF8A93A6,0},
         {0xFF0A121F,0xFF12203A,0xFF1E3350,0xFF3D8BFF,0xFF22C55E,0xFFEAF2FF,0xFF7E8DA6,0},
@@ -32,7 +31,6 @@ public class Prefs {
     public static int density(Context c){return cI(sp(c).getInt(K_D,0),2);}
     public static int menu(Context c){return cI(sp(c).getInt(K_M,0),2);}
 
-    // Scan — default 1000ms, ports 443 only
     public static void setTimeoutMs(Context c,int ms){sp(c).edit().putInt(K_TO,ms).apply();}
     public static int getTimeoutMs(Context c){return sp(c).getInt(K_TO,1000);}
     public static void setPorts(Context c,String p){sp(c).edit().putString(K_P,p).apply();}
@@ -50,6 +48,8 @@ public class Prefs {
     public static String getMethodStr(Context c){return getMethod(c)==1?"HEAD":"GET";}
     public static void setThreads(Context c,int t){sp(c).edit().putInt(K_TH,t).apply();}
     public static int getThreads(Context c){int v=sp(c).getInt(K_TH,50);if(v<1)v=1;if(v>500)v=500;return v;}
+    public static void setUserAgent(Context c,String ua){sp(c).edit().putString(K_UA,ua).apply();}
+    public static String getUserAgent(Context c){return sp(c).getString(K_UA,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");}
 
     public static int bg(Context c){return TC[theme(c)][0];}
     public static int card(Context c){return TC[theme(c)][1];}
