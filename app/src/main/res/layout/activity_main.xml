@@ -12,15 +12,14 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- HEADER -->
         <TextView
             android:id="@+id/tvHeader"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="◈ SNI TUNNEL ANALYSIS ◈"
+            android:text="SNI SCANNER"
             android:textColor="@color/accent"
-            android:textSize="20sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:fontFamily="monospace"/>
 
@@ -29,20 +28,19 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="High-speed TLS · SNI · DPI · Proxy scanner"
+            android:text="Network reconnaissance toolkit"
             android:textColor="@color/textMuted"
             android:textSize="12sp"
             android:fontFamily="monospace"/>
 
-        <!-- STATS -->
         <LinearLayout
+            android:id="@+id/statsRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginTop="16dp">
 
             <LinearLayout
-                android:id="@+id/statScans"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -70,7 +68,6 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/statHits"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -98,7 +95,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- ACTION BUTTONS -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -130,36 +126,22 @@
                 android:background="@drawable/btn_red"/>
         </LinearLayout>
 
-        <!-- SECTION TITLE -->
-        <TextView
-            android:id="@+id/tvSectionScanners"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="4dp"
-            android:text="SCANNERS"
-            android:textColor="@color/textMuted"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.15"/>
-
-        <!-- MENU CONTAINER (populated in code) -->
         <LinearLayout
             android:id="@+id/menuContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"/>
+            android:orientation="vertical"
+            android:layout_marginTop="8dp"/>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
             android:layout_marginBottom="8dp"
-            android:text="© Syamthanda"
-            android:gravity="center"
+            android:text="v3.0"
             android:textColor="@color/textMuted"
             android:textSize="11sp"
+            android:gravity="center"
             android:fontFamily="monospace"/>
-
     </LinearLayout>
 </ScrollView>
