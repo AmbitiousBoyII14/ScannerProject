@@ -6,7 +6,6 @@
     android:orientation="vertical"
     android:background="@color/bg">
 
-    <!-- HEADER -->
     <LinearLayout
         android:id="@+id/scannerHeader"
         android:layout_width="match_parent"
@@ -20,7 +19,7 @@
             android:id="@+id/btnBack"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="\u2190"
+            android:text="&#8592;"
             android:textColor="@color/accent"
             android:textSize="26sp"
             android:paddingEnd="14dp"
@@ -51,7 +50,6 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- INPUT CARD -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -118,7 +116,6 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- STATUS BAR -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -181,7 +178,6 @@
         android:max="100"
         android:progress="0"/>
 
-    <!-- TAB BAR -->
     <LinearLayout
         android:id="@+id/tabBar"
         android:layout_width="match_parent"
@@ -228,7 +224,6 @@
             android:background="@drawable/btn_outline"/>
     </LinearLayout>
 
-    <!-- CONTENT AREA -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -261,7 +256,6 @@
             android:visibility="gone"/>
     </FrameLayout>
 
-    <!-- BOTTOM ACTIONS -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -278,8 +272,7 @@
             android:text="STOP"
             android:textColor="@color/textMuted"
             android:textStyle="bold"
-            android:background="@drawable/btn_outline"
-            android:enabled="false"/>
+            android:background="@drawable/btn_outline"/>
 
         <Button
             android:id="@+id/btnSave"
@@ -293,5 +286,4 @@
             android:textStyle="bold"
             android:background="@drawable/btn_red"/>
     </LinearLayout>
-
 </LinearLayout>
