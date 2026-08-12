@@ -2,21 +2,14 @@ package myscanne.com;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
-
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Simple JSON-backed history persistence using SharedPreferences.
- * Stores every completed scan session so the Dashboard + History screen can read it back.
- * Java 7 compatible – no lambdas / streams.
- */
 public class HistoryStore {
 
     private static final String PREFS = "scanner_history";
@@ -25,12 +18,12 @@ public class HistoryStore {
 
     public static class Entry {
         public long id;
-        public String type;    // TLS, SNI, PROXY, PORT, DNS, DPI, SPLIT
-        public String target;  // domain / file name
-        public String date;    // human readable
-        public int total;      // hosts scanned
-        public int found;      // hits
-        public String results; // full text log
+        public String type;
+        public String target;
+        public String date;
+        public int total;
+        public int found;
+        public String results;
     }
 
     public static void add(Context ctx, String type, String target, int total, int found, String results) {
@@ -46,7 +39,6 @@ public class HistoryStore {
             o.put("total", total);
             o.put("found", found);
             o.put("results", results);
-            // newest first
             JSONArray out = new JSONArray();
             out.put(o);
             for (int i = 0; i < arr.length() && i < MAX_ENTRIES - 1; i++) {
@@ -61,18 +53,17 @@ public class HistoryStore {
         JSONArray arr = readArray(p);
         List<Entry> list = new ArrayList<Entry>();
         for (int i = 0; i < arr.length(); i++) {
-            try {
-                JSONObject o = arr.getJSONObject(i);
-                Entry e = new Entry();
-                e.id = o.optLong("id");
-                e.type = o.optString("type");
-                e.target = o.optString("target");
-                e.date = o.optString("date");
-                e.total = o.optInt("total");
-                e.found = o.optInt("found");
-                e.results = o.optString("results");
-                list.add(e);
-            } catch (Exception ignored) {}
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            Entry e = new Entry();
+            e.id = o.optLong("id");
+            e.type = o.optString("type", "");
+            e.target = o.optString("target", "");
+            e.date = o.optString("date", "");
+            e.total = o.optInt("total", 0);
+            e.found = o.optInt("found", 0);
+            e.results = o.optString("results", "");
+            list.add(e);
         }
         return list;
     }
