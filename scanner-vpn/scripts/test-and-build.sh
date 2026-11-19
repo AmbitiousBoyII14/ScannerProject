@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Disposable loopback-only SSH endpoint for the CI integration test. Never uses a user's server.
-set -eu
+set -euo pipefail
 cd "$(dirname "$0")/.."
 work=$(mktemp -d)
 account="svpn${RANDOM}test"
@@ -27,4 +27,14 @@ MaxSessions 0
 CONFIG
 sudo mkdir -p /run/sshd
 sudo /usr/sbin/sshd -f "$work/sshd_config"
-./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+if ! ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon --console=plain 2>&1 | tee "$work/build.log"; then
+  # Surface only build/test diagnostics (never environment variables or passwords).
+  grep -E '(^(e: |ERROR: |\* What went wrong:|> |Execution failed)| FAILED$|Exception at )' "$work/build.log" | tail -25 | while IFS= read -r line; do echo "::error::$line"; done
+  python3 - <<'PYTEST'
+import glob, xml.etree.ElementTree as ET
+for name in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml'):
+    for failure in ET.parse(name).iter('failure'):
+        print('::error::' + failure.attrib.get('message','test failed').splitlines()[0])
+PYTEST
+  exit 1
+fi
