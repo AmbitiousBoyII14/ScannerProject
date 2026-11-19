@@ -69,7 +69,11 @@ class LiveActivity:Activity(){
             }.start()
         }catch(e:Exception){enrollmentResult("Check the account format, server, port and username. Stop active sessions before saving.",false)}
     }
+    private val remembered by lazy { RememberedSsh(applicationContext) }
     inner class Bridge{
+        @JavascriptInterface fun rememberSsh(raw:String)=runCatching{remembered.save(raw);true}.getOrDefault(false)
+        @JavascriptInterface fun rememberedSsh()=runCatching{remembered.load()}.getOrDefault("")
+        @JavascriptInterface fun forgetSsh()=runCatching{remembered.forget();true}.getOrDefault(false)
         @JavascriptInterface fun clearSessionLog()=LiveState.clearSessionLog()
         @JavascriptInterface fun copySessionLog(){val text=LiveState.sessionLogText();if(text.isEmpty())return;runOnUiThread{
             val clip=android.content.ClipData.newPlainText("Scanner VPN session log",text);clip.description.extras=android.os.PersistableBundle().apply{putBoolean("android.content.extra.IS_SENSITIVE",true)};getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(clip)

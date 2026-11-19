@@ -36,12 +36,14 @@ class AccountFlowTest {
             until("!document.getElementById('sheet').open")
             js("document.querySelector('[data-tool=sni]').click();document.querySelector('#body input').value='localhost';document.querySelector('#body .apply').click()");until("document.getElementById('profile').textContent==='SSH WS TLS'")
             // Local 403 fixture is deliberately plain HTTP.
-            js("document.querySelectorAll('#flags input')[1].click();document.querySelector('[data-tool=dns]').click();document.querySelectorAll('#body input')[1].value='9.9.9.9';document.querySelector('#body .apply').click()");js("document.querySelector('[data-tool=udp]').click();document.querySelector('#body .apply').click();document.getElementById('connect').click()")
+            js("document.querySelectorAll('#flags input')[1].click();document.querySelector('[data-tool=dns]').click();document.querySelectorAll('#body input')[1].value='9.9.9.9';document.querySelector('#body .apply').click()");js("document.querySelector('[data-tool=udp]').click();document.querySelector('#body .apply').click();document.getElementById('remember').click();document.getElementById('connect').click()")
             assertEquals("GET /fixture HTTP/1.1",received.poll(15,TimeUnit.SECONDS));until("document.getElementById('events').textContent.includes('HTTP 403')");assertEquals("false",js("document.getElementById('events').textContent.includes('example.test/password')"))
             js("document.getElementById('copyLog').click()")
             var copied="";for(n in 0..30){inst.runOnMainSync{copied=ctx.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text.toString()};if("HTTP 403" in copied)break;Thread.sleep(100)}
             assertTrue(copied.contains("HTTP 403"));assertFalse(copied.contains("example.test/password"))
             js("document.getElementById('clearLog').click();document.querySelector('#body .apply').click()");until("document.getElementById('copyLog').disabled && !document.getElementById('events').textContent.includes('HTTP 403')")
+            js("location.reload()");until("typeof receiveAccount==='function' && document.getElementById('remember').checked && document.getElementById('account').value.endsWith('example.test/password')");js("document.getElementById('remember').click()");until("Client.rememberedSsh()==='' ")
+
 
         }}finally{inst.runOnMainSync{a.finish()}}
     }
