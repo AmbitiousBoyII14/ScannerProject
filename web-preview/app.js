@@ -17,7 +17,7 @@ function run(){
   const cfg=config();current={time:new Date().toISOString(),mode:'Local simulation (no network requests)',profile:cfg.name,status:'Running',rows:p.valid.map(host=>({host,state:'Queued'}))};
   let i=0,step=0,events=[];$('batchTrace').replaceChildren();
   function tick(){const item=current.rows[i];if(step===0)events=stages(item.host,cfg);
-    const [tag,message]=events[step++];item.state=tag;trace('batchTrace',tag,item.host+' · '+message);
+    const [tag,message]=events[step++];item.state=tag;trace('batchTrace',tag,message);
     if(step===events.length){item.state=tag==='ONLINE'?'Demo: connected':'Demo: timeout';step=0;if(++i===current.rows.length){finish(false);return}}
     render();
   }
@@ -38,12 +38,12 @@ function simulate(host, profile){
   return hash%4!==0;
 }
 function go(view){
-  for(const id of ['home','work','past'])$(id).hidden=id!==view;
+  for(const id of ['home','work','configuration','past'])$(id).hidden=id!==view;
   document.querySelectorAll('[data-page]').forEach(b=>{
     const active=b.dataset.page===(view==='past'?'work':view);
     b.classList.toggle('active',active);b.setAttribute('aria-current',active?'page':'false');
   });
-  if(view!=='past')$(view==='home'?'singleProfile':'batchProfile').append($('editor'));if(view==='past')archive();window.scrollTo(0,0);
+  if(view==='past')archive();window.scrollTo(0,0);
 }
 document.querySelectorAll('[data-page],[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.page||b.dataset.go));
 let delay,clock,start,lastFailure=false;
@@ -61,20 +61,45 @@ function paint(){
   if(!online)$('uptime').textContent='00:00';
   count();
 }
+const presets=[
+  {name:'SSH · WebSocket TLS',short:'WS+',detail:'SSH over secure WebSocket',proto:'SSH',tls:true,ws:true,port:443},
+  {name:'SSH',short:'SSH',detail:'Direct TCP connection',proto:'SSH',port:22},
+  {name:'SSH · WebSocket',short:'WS',detail:'HTTP upgrade transport',proto:'SSH',ws:true,port:80},
+  {name:'SSH · SSL / SNI',short:'TLS',detail:'TLS with a server name',proto:'SSH',tls:true,port:443},
+  {name:'VLESS · WebSocket TLS',short:'VL',detail:'UUID over secure WebSocket',proto:'VLESS',tls:true,ws:true,port:443},
+  {name:'VLESS · TCP',short:'TCP',detail:'UUID over direct TCP',proto:'VLESS',port:443}
+];
+let selected=0;
+const drafts=new Map(), fields=[...$('profileFields').querySelectorAll('input,select')];
+const defaults=Object.fromEntries(fields.map(f=>[f.id,f.value]));
+presets.forEach((p,i)=>{
+  const btn=document.createElement('button');btn.className='profilecard';
+  for(const [cls,text] of [['sigil',p.short],['title',p.name],['desc',p.detail]]){
+    const el=document.createElement('span');el.className=cls;el.textContent=text;btn.append(el);
+  }
+  btn.onclick=()=>{drafts.set(selected,Object.fromEntries(fields.map(f=>[f.id,f.value])));selected=i;
+    const data=drafts.get(i)||{...defaults,port:p.port};fields.forEach(f=>f.value=data[f.id]);paint()};
+  $('profiles').append(btn);
+});
 function syncProfile(){
-  $('profileFields').disabled=state!=='idle'||!!timer;
-  for(const [selector,visible] of [['[data-ssh]',$('profile').value==='SSH'],['[data-vless]',$('profile').value==='VLESS'],['[data-ws]',$('transport').value!=='TCP']]){
+  const p=presets[selected],locked=state!=='idle'||!!timer;
+  $('profileFields').disabled=locked;
+  [...$('profiles').children].forEach((el,i)=>{el.disabled=locked;el.setAttribute('aria-pressed',String(i===selected))});
+  for(const [selector,visible] of [['[data-ssh]',p.proto==='SSH'],['[data-vless]',p.proto==='VLESS'],['[data-ws]',p.ws],['[data-tls]',p.tls]]){
     document.querySelectorAll(selector).forEach(label=>{label.hidden=!visible;label.querySelector('input').disabled=!visible});
   }
-  $('summaryName').textContent=config().name;
+  $('summaryName').textContent=p.name;document.querySelectorAll('.profileName').forEach(el=>el.textContent=config().name);
+  $('configNote').textContent=locked?'Stop active sessions to edit this profile.':'Use demo values. Credentials are never logged or saved.';
 }
 function profileValid(){return [...$('profileFields').querySelectorAll('input')].every(el=>el.closest('label').hidden||el.checkValidity())}
-function config(){return {proto:$('profile').value,ws:$('transport').value!=='TCP',port:$('port').value,udp:$('udp').value==='Simulated',name:`${$('profile').value} · ${$('transport').value} :${$('port').value}`}}
+function config(){const p=presets[selected];return {...p,port:$('port').value,udp:$('udp').value==='Simulated',name:`${p.name} :${$('port').value}`}}
 function stages(host,c){
-  const steps=[['START','Attempt opened'],['DNS','Target resolved (fixture)'],['TCP','Transport opened on port '+c.port]];
-  if(!simulate(host,c.name))return [...steps,['ERROR','Simulated peer timeout']];
-  if(c.ws)steps.push(['TLS','TLS negotiation complete'],['WS','WebSocket upgrade accepted']);
-  steps.push([c.proto,c.proto==='SSH'?'SSH authentication accepted':'Client UUID accepted'],['UDP',c.udp?'Forwarding enabled (demo)':'Forwarding disabled; skipped'],['ONLINE','Demo tunnel connected']);return steps;
+  const n=Array.from(host).reduce((a,ch)=>(a*31+ch.charCodeAt(0))>>>0,0);
+  const ip='192.0.2.'+(1+n%254),endpoint=`${host}:${c.port}`;
+  const steps=[['START',`${c.proto} session → ${endpoint}`],['DNS',`A  ${host} → ${ip} (fixture)`],['TCP',`Dial ${ip}:${c.port}`]];
+  if(!simulate(host,c.name))return [...steps,['ERROR',`Timed out at ${endpoint}`]];
+  if(c.tls)steps.push(['TLS','TLS negotiation complete']);if(c.ws)steps.push(['WS','WebSocket upgrade accepted']);
+  steps.push([c.proto,c.proto==='SSH'?'SSH authentication accepted':'Client UUID accepted'],['UDP',c.udp?'Forwarding enabled (demo)':'Forwarding disabled; skipped'],['ONLINE',`Connected to ${endpoint}`]);return steps;
 }
 function trace(id,tag,message){const box=$(id),line=document.createElement('div'),stamp=document.createElement('time'),badge=document.createElement('b');stamp.textContent=new Date().toLocaleTimeString('en-GB');badge.textContent=tag;line.dataset.tag=tag;line.append(stamp,badge,document.createTextNode(message));box.append(line);while(box.children.length>120)box.firstElementChild.remove();box.scrollTop=box.scrollHeight}
 $('profileFields').oninput=$('target').oninput=()=>{lastFailure=false;paint()};
@@ -83,7 +108,7 @@ $('connect').onclick=()=>{
   if(state!=='idle'){trace('singleTrace','STOP',state==='pending'?'Attempt cancelled':'Tunnel disconnected');state='idle';paint();return}
   if(!domain.test(target())||!profileValid())return;
   const events=stages(target(),config());let i=0;state='pending';paint();$('singleTrace').replaceChildren();
-  function tick(){const [tag,msg]=events[i++];trace('singleTrace',tag,target()+' · '+msg);if(i!==events.length)return;
+  function tick(){const [tag,msg]=events[i++];trace('singleTrace',tag,msg);if(i!==events.length)return;
     clearInterval(delay);lastFailure=tag==='ERROR';state=lastFailure?'idle':'connected';paint();if(lastFailure)return;
     start=Date.now();clock=setInterval(()=>{const t=Math.floor((Date.now()-start)/1000);$('uptime').textContent=[Math.floor(t/60),t%60].map(n=>String(n).padStart(2,'0')).join(':')},1000);
   }
