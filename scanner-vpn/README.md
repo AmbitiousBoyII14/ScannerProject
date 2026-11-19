@@ -9,3 +9,10 @@ The scanner verifies saved profiles, not unknown targets. Health checks request 
 **Build:** JDK 17, Android SDK 36.1. Run `./scripts/fetch-core.sh` (verified SHA-256) and `./gradlew :app:assembleDebug`. The CI workflow publishes a debug-signed prerelease APK. If installing over a preview signed by a different CI debug key, Android may require uninstalling the old preview first.
 
 Native dependency: [AndroidLibXrayLite v26.11.9](https://github.com/2dust/AndroidLibXrayLite/tree/v26.11.9), including [Xray-core](https://github.com/XTLS/Xray-core/tree/676eaf66f8f0). Corresponding source, build instructions and module revisions are in those repositories. License texts are included in the app assets. Original Dark Tunnel fork is Apache-licensed (see LICENSE); legacy preview components are not registered as Android services or activities.
+
+### Android client 1.2
+
+- Screenshots are permitted by default. Settings persists optional screenshot blocking, display wake lock, log following and rate visibility (never credentials).
+- Scanner accepts pasted hostnames or a UTF-8 `.txt` document (up to 64 KiB) via Android's document picker. Unknown hosts must be configured first. A deduplicated list runs only matching saved profiles, using each profile's own credentials.
+- Also supports VMess over WebSocket/TLS and authenticated SOCKS5 / HTTP CONNECT over TLS. The server must accept the selected TLS transport; HTTP CONNECT only carries TCP. SSH and PHP relay cards are unavailable, not simulated.
+- CI ships individual standalone APKs per ABI. Most current Android phones use **arm64-v8a**. The app no longer packages the archived Compose preview (`legacy/`), and each APK contains only one compressed copy of the native engine. Compressed native libraries may use additional space after installation.

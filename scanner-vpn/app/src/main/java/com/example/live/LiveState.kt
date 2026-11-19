@@ -20,14 +20,24 @@ internal object LiveState {
     @Volatile var down=0.0
     @Volatile var since=0L
     private val logs=ArrayDeque<String>();private val checks=ArrayDeque<String>()
+    private var total=0;private var completed=0
     private val executor=Executors.newSingleThreadExecutor()
     @Synchronized fun save(p:Profile){require(editable() && (profiles.size<12||profiles.containsKey(p.label)));profiles[p.label]=p;chosen=p.label}
     @Synchronized fun select(key:String){if(editable() && profiles.containsKey(key))chosen=key}
     @Synchronized fun active()=profiles[chosen]
     fun editable()=status in setOf("Idle","Failed")&&!batchRunning
     @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=100)list.removeFirst();list.addLast("$stamp  $tag  $text")}
-    @Synchronized fun snapshot()=obj("state" to status,"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
+    @Synchronized fun snapshot()=obj("state" to status,"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
     fun resolve(p:Profile,batch:Boolean=false):String {val ip=InetAddress.getAllByName(p.host).first().hostAddress!!;log("DNS","${p.host} → $ip",batch);return ip}
-    @Synchronized fun check(context:Context,all:Boolean){if(!editable()||profiles.isEmpty())return;val items=if(all)profiles.values.toList() else listOfNotNull(active());stopBatch=false;batchRunning=true;checks.clear();executor.execute {try{Engine.init(context);for(p in items){if(stopBatch)break;log("START",p.label,true);try{val cfg=p.config(resolve(p,true));if(stopBatch)break;val delay=Libv2ray.measureOutboundDelay(cfg,CHECK_URL);if(!stopBatch)log("VERIFIED","${p.host}:${p.port} · HTTPS via profile · $delay ms",true)}catch(e:Exception){if(!stopBatch)log("FAILED","${p.host}:${p.port} · check DNS, credentials, TLS and reachability",true)}}}finally{if(stopBatch)log("STOP","Checks cancelled",true);batchRunning=false}}}
+    @Synchronized fun check(context:Context,all:Boolean,text:String?=null):Boolean {
+        if(!editable()||profiles.isEmpty())return false
+        val items=if(text!=null){
+            if(text.length>65536)return false
+            val hosts=text.lowercase().split(Regex("[\\s,;]+" )).map{it.trimEnd('.')}.filter{it.isNotEmpty()}.distinct()
+            if(hosts.isEmpty()||hosts.size>100||hosts.any{h->profiles.values.none{it.host==h}})return false
+            hosts.flatMap{h->profiles.values.filter{it.host==h}}
+        }else if(all)profiles.values.toList() else listOfNotNull(active())
+        total=items.size;completed=0
+        stopBatch=false;batchRunning=true;checks.clear();executor.execute {try{Engine.init(context);for(p in items){if(stopBatch)break;log("START",p.label,true);try{val cfg=p.config(resolve(p,true));if(stopBatch)break;val delay=Libv2ray.measureOutboundDelay(cfg,CHECK_URL);if(!stopBatch)log("VERIFIED","${p.host}:${p.port} · HTTPS via profile · $delay ms",true)}catch(e:Exception){if(!stopBatch)log("FAILED","${p.host}:${p.port} · check DNS, credentials, TLS and reachability",true)};if(!stopBatch)synchronized(this){completed++}}}finally{if(stopBatch)log("STOP","Checks cancelled",true);batchRunning=false}};return true}
     fun cancel(){stopBatch=true}
 }
