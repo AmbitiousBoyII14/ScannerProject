@@ -25,7 +25,7 @@ class AccountFlowTest {
         inst.uiAutomation.executeShellCommand("wm dismiss-keyguard").close()
         inst.runOnMainSync{find(a.window.decorView)?.apply{isFocusableInTouchMode=true;requestFocus()}}
         fun js(expr:String):String{val result=ArrayBlockingQueue<String>(1);inst.runOnMainSync{find(a.window.decorView)!!.evaluateJavascript(expr){result.offer(it?:"null")}};return requireNotNull(result.poll(5,TimeUnit.SECONDS))}
-        fun until(expr:String){repeat(200){if(js(expr)=="true")return;Thread.sleep(100)};fail("UI condition: $expr; state="+js("JSON.stringify([document.readyState,document.title,typeof receiveAccount,typeof Client,document.hasFocus(),document.getElementById('hint')?.textContent,document.getElementById('events')?.textContent?.slice(-220)])"))}
+        fun until(expr:String){repeat(200){if(js(expr)=="true")return;Thread.sleep(100)};fail("UI condition: $expr; state="+js("JSON.stringify([document.readyState,document.title,typeof receiveAccount,typeof Client,document.hasFocus(),document.querySelector('#body .hint')?.textContent,document.getElementById('hint')?.textContent,document.getElementById('events')?.textContent?.slice(-220)])"))}
         try{ServerSocket(0,1,InetAddress.getByName("127.0.0.1")).use{server->
             val received=ArrayBlockingQueue<String>(1);server.soTimeout=60000
             thread(isDaemon=true){runCatching{server.accept().use{s->val r=s.getInputStream().bufferedReader();received.put(r.readLine());while(!r.readLine().isNullOrEmpty()){};s.getOutputStream().write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n".toByteArray())}}}
