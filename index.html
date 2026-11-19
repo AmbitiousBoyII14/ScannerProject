@@ -1,0 +1,1932 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-state="idle">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Scanner VPN — UI preview</title>
+<style>
+/* ============================================================
+   Scanner VPN — shipped WebView stylesheet
+   Instrument-grade identity: cobalt brand, status-semantic
+   colour kept separate from brand colour. System fonts only,
+   no remote assets, no decorative gradients.
+   ============================================================ */
+:root{
+  --brand-400:#7D93FF; --brand-500:#4D6BFF; --brand-600:#3A55E8;
+  --jade-400:#2FE0AE;  --jade-600:#0E9E7A;
+  --amber-400:#FFC266; --amber-600:#C97F22;
+  --rose-400:#FF8086;  --rose-600:#C93B40;
+
+  --r-xs:8px; --r-sm:12px; --r-md:16px; --r-lg:20px; --r-full:999px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px;
+
+  --font:Roboto,-apple-system,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+  --mono:"Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --d1:120ms; --d2:200ms; --d3:320ms; --d4:480ms;
+
+  --nav-h:60px;
+  --max-w:470px;
+}
+html[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#0A0E14; --surface:#131A24; --surface-2:#18212D; --surface-3:#1E2836;
+  --hairline:rgba(255,255,255,.07); --hairline-2:rgba(255,255,255,.13);
+  --text:#E8ECF3; --text-2:#A3AFC2; --text-3:#6B7A90;
+  --brand:var(--brand-500); --brand-soft:rgba(77,107,255,.15);
+  --jade:var(--jade-400); --jade-soft:rgba(47,224,174,.13);
+  --amber:var(--amber-400); --amber-soft:rgba(255,194,102,.13);
+  --rose:var(--rose-400); --rose-soft:rgba(255,128,134,.13);
+  --violet:#B98BFF;
+  --sh1:0 1px 2px rgba(0,0,0,.45); --sh2:0 8px 26px -10px rgba(0,0,0,.7); --sh3:0 22px 50px -18px rgba(0,0,0,.85);
+  --scrim:rgba(4,7,11,.74); --track:rgba(255,255,255,.08);
+  /* a selected segment reads lighter than its groove in both themes */
+  --seg-track:rgba(255,255,255,.045); --seg-on:#273243;
+}
+html[data-theme=light]{
+  color-scheme:light;
+  --bg:#F4F6FA; --surface:#FFFFFF; --surface-2:#F7F9FC; --surface-3:#EDF1F7;
+  --hairline:rgba(14,22,36,.09); --hairline-2:rgba(14,22,36,.17);
+  --text:#0E1624; --text-2:#55637A; --text-3:#8390A5;
+  --brand:var(--brand-600); --brand-soft:rgba(77,107,255,.10);
+  --jade:var(--jade-600); --jade-soft:rgba(14,158,122,.11);
+  --amber:var(--amber-600); --amber-soft:rgba(201,127,34,.11);
+  --rose:var(--rose-600); --rose-soft:rgba(201,59,64,.10);
+  --violet:#7A3FC4;
+  --sh1:0 1px 2px rgba(16,24,40,.06); --sh2:0 8px 24px -10px rgba(16,24,40,.18); --sh3:0 24px 48px -18px rgba(16,24,40,.26);
+  --scrim:rgba(16,24,40,.44); --track:rgba(14,22,36,.08);
+  --seg-track:#E7ECF4; --seg-on:#FFFFFF;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--font);font-size:15px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  overscroll-behavior-y:none;overflow:hidden;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:none;border:0;padding:0;cursor:pointer;-webkit-appearance:none}
+h1,h2,h3,p{margin:0}
+ul{margin:0;padding:0;list-style:none}
+[hidden]{display:none !important}
+.hidden{display:none !important}
+svg{display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+::selection{background:var(--brand-soft)}
+.spacer{flex:1}
+.num{font-variant-numeric:tabular-nums}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}}
+
+/* ---------- frame ----------
+   The frame owns the viewport height so .scroll is the only scroller and the
+   tab bar stays pinned; dvh keeps it honest while Android's URL-less WebView
+   resizes. vh first for WebViews that predate dvh. */
+#app{position:relative;width:100%;max-width:var(--max-w);margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+@media (min-width:900px){
+  body{display:flex;align-items:center;justify-content:center;padding:26px 0}
+  #app{height:min(900px,calc(100dvh - 52px));border-radius:32px;border:1px solid var(--hairline-2);box-shadow:var(--sh3)}
+}
+
+/* ---------- topbar ---------- */
+.topbar{
+  position:relative;z-index:30;flex:0 0 auto;
+  padding:calc(env(safe-area-inset-top) + 10px) var(--sp-5) 10px;
+  display:flex;align-items:center;gap:var(--sp-2);
+  background:var(--bg);border-bottom:1px solid transparent;transition:border-color var(--d2) var(--ease);
+}
+.topbar.is-stuck{border-bottom-color:var(--hairline)}
+.brandmark{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:30px;height:30px;border-radius:9px;flex:0 0 auto;display:grid;place-items:center;background:var(--brand);color:#fff}
+.logo svg{width:16px;height:16px;fill:currentColor;stroke:none}
+.wordmark{font-size:16px;font-weight:700;letter-spacing:-.025em;white-space:nowrap}
+.wordmark span{color:var(--text-3);font-weight:500}
+.iconbtn{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;color:var(--text-2);transition:background var(--d1) var(--ease),color var(--d1) var(--ease),transform var(--d1) var(--ease)}
+.iconbtn svg{width:19px;height:19px}
+.iconbtn:hover{background:var(--surface-2);color:var(--text)}
+.iconbtn:active{transform:scale(.92)}
+
+/* ---------- scroll + views ---------- */
+.scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 var(--sp-5) calc(var(--nav-h) + env(safe-area-inset-bottom) + 28px);scrollbar-width:thin}
+.scroll::-webkit-scrollbar{width:5px}
+.scroll::-webkit-scrollbar-thumb{background:var(--hairline-2);border-radius:3px}
+.view{display:none}
+.view.is-active{display:block;animation:viewIn var(--d3) var(--ease-out) both}
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ---------- primitives ---------- */
+.card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);box-shadow:var(--sh1)}
+.card-pad{padding:var(--sp-4)}
+.section{margin-top:var(--sp-6)}
+.section-head{display:flex;align-items:center;gap:var(--sp-2);padding:0 2px var(--sp-3)}
+.section-title{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.linkbtn{font-size:12.5px;font-weight:600;color:var(--brand);padding:4px 8px;border-radius:8px;transition:background var(--d1) var(--ease)}
+.linkbtn:hover{background:var(--brand-soft)}
+.linkbtn.danger{color:var(--rose)}
+.linkbtn.danger:hover{background:var(--rose-soft)}
+.linkbtn:disabled{opacity:.4;pointer-events:none}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px;border-radius:var(--r-sm);font-size:14.5px;font-weight:600;letter-spacing:-.01em;border:1px solid transparent;white-space:nowrap;transition:background var(--d1) var(--ease),border-color var(--d1) var(--ease),transform var(--d1) var(--ease),opacity var(--d1) var(--ease)}
+.btn svg{width:17px;height:17px;flex:0 0 auto}
+.btn:active{transform:scale(.975)}
+.btn:disabled{opacity:.42;pointer-events:none}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-primary:hover{background:var(--brand-600)}
+.btn-ghost{background:var(--surface-2);color:var(--text);border-color:var(--hairline)}
+.btn-ghost:hover{background:var(--surface-3)}
+.btn-danger{background:var(--rose-soft);color:var(--rose);border-color:color-mix(in srgb,var(--rose) 28%,transparent)}
+.btn-block{width:100%}
+.btn-sm{height:34px;padding:0 12px;font-size:13px;border-radius:10px;gap:6px}
+.btn-sm svg{width:15px;height:15px}
+
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:var(--r-full);font-size:11.5px;font-weight:650;background:var(--surface-3);color:var(--text-2);border:1px solid var(--hairline)}
+.chip.brand{background:var(--brand-soft);color:var(--brand);border-color:color-mix(in srgb,var(--brand) 24%,transparent)}
+.chip.jade{background:var(--jade-soft);color:var(--jade);border-color:color-mix(in srgb,var(--jade) 26%,transparent)}
+.chip.amber{background:var(--amber-soft);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 28%,transparent)}
+.chip.rose{background:var(--rose-soft);color:var(--rose);border-color:color-mix(in srgb,var(--rose) 28%,transparent)}
+
+/* ---------- hero / dial ---------- */
+.hero{padding:var(--sp-2) 0 0;display:flex;flex-direction:column;align-items:center}
+.statusline{display:flex;align-items:center;gap:8px;margin-bottom:var(--sp-3)}
+.statusdot{width:7px;height:7px;border-radius:50%;background:var(--text-3);position:relative;flex:0 0 auto}
+.statusdot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid currentColor;opacity:0}
+.statustext{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--text-2)}
+[data-state=online] .statusdot{background:var(--jade);color:var(--jade)}
+[data-state=online] .statusdot::after{animation:ripple 2.6s var(--ease-out) infinite}
+[data-state=online] .statustext{color:var(--jade)}
+[data-state=pending] .statusdot,[data-state=closing] .statusdot{background:var(--amber);color:var(--amber)}
+[data-state=pending] .statusdot::after{animation:ripple 1.1s var(--ease-out) infinite}
+[data-state=pending] .statustext,[data-state=closing] .statustext{color:var(--amber)}
+[data-state=error] .statusdot{background:var(--rose)}
+[data-state=error] .statustext{color:var(--rose)}
+@keyframes ripple{0%{opacity:.9;transform:scale(.6)}100%{opacity:0;transform:scale(1.9)}}
+
+.dial{position:relative;width:212px;height:212px;display:grid;place-items:center;touch-action:manipulation;transition:transform var(--d2) var(--ease);--accent:var(--text-3)}
+.dial:active{transform:scale(.975)}
+.dial:disabled{opacity:.6;pointer-events:none}
+.dial .ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.ring .track{fill:none;stroke:var(--track);stroke-width:4}
+.ring .arc{fill:none;stroke:var(--accent);stroke-width:4;stroke-linecap:round;stroke-dasharray:0 999;transform-origin:50% 50%;transition:stroke-dasharray var(--d4) var(--ease-out),stroke var(--d3) var(--ease),opacity var(--d2) var(--ease)}
+/* A zero-length arc with a round cap still paints a dot — hide it when idle. */
+[data-state=idle] .ring .arc{opacity:0}
+.dial .halo{position:absolute;width:172px;height:172px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 18%,transparent) 0%,transparent 68%);opacity:0;transition:opacity var(--d4) var(--ease)}
+.dial .pulsering{position:absolute;width:172px;height:172px;border-radius:50%;border:1px solid color-mix(in srgb,var(--accent) 42%,transparent);opacity:0}
+.dial .core{position:relative;z-index:2;width:152px;height:152px;border-radius:50%;background:var(--surface);border:1px solid var(--hairline-2);box-shadow:var(--sh2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:border-color var(--d3) var(--ease)}
+.dial .glyph{width:32px;height:32px;color:var(--accent);margin-bottom:5px;transition:color var(--d3) var(--ease)}
+.dial .glyph svg{width:100%;height:100%;stroke-width:1.6}
+.dial .label{font-size:14px;font-weight:700;letter-spacing:.02em;color:var(--text)}
+.dial .label.timer{font-family:var(--mono);font-size:19px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.dial .sub{font-size:11px;color:var(--text-3);letter-spacing:.02em;max-width:118px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-state=pending] .dial,[data-state=closing] .dial{--accent:var(--amber)}
+[data-state=online] .dial{--accent:var(--jade)}
+[data-state=error] .dial{--accent:var(--rose)}
+[data-state=online] .dial .halo{opacity:1}
+[data-state=pending] .dial .halo{opacity:.85}
+[data-state=online] .dial .core{border-color:color-mix(in srgb,var(--jade) 32%,transparent)}
+[data-state=online] .dial .pulsering{animation:breathe 3.4s var(--ease-out) infinite}
+@keyframes breathe{0%{opacity:.5;transform:scale(1)}70%,100%{opacity:0;transform:scale(1.24)}}
+[data-state=pending] .ring .arc,[data-state=closing] .ring .arc{transition:none;animation:sweep 1.2s linear infinite}
+@keyframes sweep{to{transform:rotate(360deg)}}
+[data-state=pending] .dial .glyph{animation:gp 1.6s var(--ease) infinite}
+@keyframes gp{0%,100%{opacity:1}50%{opacity:.4}}
+.dial-hint{margin-top:var(--sp-3);font-size:12.5px;color:var(--text-3);min-height:18px;text-align:center;padding:0 16px;line-height:1.4}
+.dial-hint:empty{margin-top:0;min-height:0}
+
+/* ---------- profile pill ---------- */
+.profile-pill{width:100%;margin-top:var(--sp-3);display:flex;align-items:center;gap:var(--sp-3);padding:10px var(--sp-4) 10px var(--sp-3);background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);box-shadow:var(--sh1);text-align:left;transition:background var(--d1) var(--ease),border-color var(--d1) var(--ease),transform var(--d1) var(--ease)}
+.profile-pill:hover{background:var(--surface-2);border-color:var(--hairline-2)}
+.profile-pill:active{transform:scale(.99)}
+.profile-pill .avatar{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand);font-weight:700;font-size:13.5px;border:1px solid color-mix(in srgb,var(--brand) 22%,transparent)}
+.profile-pill .meta{flex:1;min-width:0}
+.profile-pill .nm{display:block;font-size:14.5px;font-weight:650;letter-spacing:-.012em}
+.profile-pill .hs{display:block;font-size:11.5px;color:var(--text-3);font-family:var(--mono)}
+.profile-pill .caret{width:18px;height:18px;color:var(--text-3);flex:0 0 auto}
+
+/* ---------- alert ---------- */
+.alert{display:flex;align-items:flex-start;gap:10px;margin-top:var(--sp-3);padding:10px 10px 10px 12px;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--hairline);font-size:12.5px;line-height:1.45;color:var(--text-2)}
+.alert .ai{width:16px;height:16px;flex:0 0 auto;margin-top:1px;color:var(--text-3)}
+.alert .at{flex:1;min-width:0;overflow-wrap:anywhere}
+.alert .ax{width:22px;height:22px;flex:0 0 auto;color:var(--text-3);display:grid;place-items:center;border-radius:6px}
+.alert .ax svg{width:13px;height:13px}
+.alert[data-tone=bad]{background:var(--rose-soft);border-color:color-mix(in srgb,var(--rose) 26%,transparent);color:var(--rose)}
+.alert[data-tone=bad] .ai,.alert[data-tone=bad] .ax{color:var(--rose)}
+.alert[data-tone=good]{background:var(--jade-soft);border-color:color-mix(in srgb,var(--jade) 26%,transparent);color:var(--jade)}
+.alert[data-tone=good] .ai,.alert[data-tone=good] .ax{color:var(--jade)}
+.alert[data-tone=warn]{background:var(--amber-soft);border-color:color-mix(in srgb,var(--amber) 28%,transparent);color:var(--amber)}
+.alert[data-tone=warn] .ai,.alert[data-tone=warn] .ax{color:var(--amber)}
+
+/* ---------- stats ---------- */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+.stat{position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4);box-shadow:var(--sh1);min-height:80px;display:flex;flex-direction:column}
+.stat .k{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;color:var(--text-3);letter-spacing:.07em}
+.stat .k svg{width:13px;height:13px}
+.stat .v{margin-top:auto;font-size:23px;font-weight:650;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums;position:relative;z-index:1}
+.stat .u{font-size:11px;font-weight:650;color:var(--text-3);margin-left:3px;letter-spacing:0}
+.stat canvas{position:absolute;left:0;right:0;bottom:0;width:100%;height:34px}
+.stat.dl .k,.stat.dl .k svg{color:var(--jade)}
+.stat.ul .k,.stat.ul .k svg{color:var(--brand)}
+
+/* ---------- quick actions ---------- */
+.qa-row{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-2)}
+.qa{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 2px 10px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--hairline);transition:background var(--d1) var(--ease),transform var(--d1) var(--ease)}
+.qa:hover{background:var(--surface-2)}
+.qa:active{transform:scale(.96)}
+.qa svg{width:18px;height:18px;color:var(--text-2)}
+.qa span{font-size:10.5px;font-weight:600;color:var(--text-2)}
+.qa:disabled{opacity:.38;pointer-events:none}
+
+/* ---------- rows ---------- */
+.rows{overflow:hidden}
+.row{display:flex;align-items:center;gap:var(--sp-3);padding:11px var(--sp-4);min-height:52px;border-bottom:1px solid var(--hairline);width:100%;text-align:left}
+.row:last-child{border-bottom:0}
+button.row{transition:background var(--d1) var(--ease)}
+button.row:hover{background:var(--surface-2)}
+button.row:disabled{opacity:.45;pointer-events:none}
+.row .ic{width:30px;height:30px;border-radius:9px;flex:0 0 auto;display:grid;place-items:center;background:var(--surface-3);color:var(--text-2)}
+.row .ic svg{width:15px;height:15px}
+.row .lbl{flex:1;min-width:0;font-size:14px;font-weight:550}
+.row .lbl .sub{display:block;font-size:11.5px;color:var(--text-3);font-weight:400;margin-top:1px;line-height:1.35}
+.row .val{font-size:13px;color:var(--text-2);font-variant-numeric:tabular-nums;max-width:54%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .val.mono{font-family:var(--mono);font-size:12px}
+.row .caret{width:16px;height:16px;color:var(--text-3);flex:0 0 auto}
+
+/* ---------- switches ---------- */
+.switch{appearance:none;-webkit-appearance:none;width:42px;height:25px;border-radius:var(--r-full);background:var(--track);border:1px solid var(--hairline);position:relative;flex:0 0 auto;transition:background var(--d2) var(--ease),border-color var(--d2) var(--ease);margin:0;cursor:pointer}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:var(--text-3);transition:transform var(--d2) var(--ease-out),background var(--d2) var(--ease)}
+.switch:checked{background:var(--brand);border-color:var(--brand)}
+.switch:checked::after{transform:translateX(17px);background:#fff}
+.switch:disabled{opacity:.4;cursor:default}
+.switchrow{display:flex;align-items:center;gap:var(--sp-3);padding:10px 0;cursor:pointer}
+.switchrow .sl{flex:1;min-width:0}
+.switchrow .st{display:block;font-size:14px;font-weight:550}
+.switchrow .ss{display:block;font-size:11.5px;color:var(--text-3);margin-top:1px;line-height:1.35}
+
+/* ---------- flags (transport toggles) ---------- */
+.flags{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+.flags label{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 10px;border-radius:var(--r-full);background:var(--surface-2);border:1px solid var(--hairline);font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;transition:background var(--d1) var(--ease),color var(--d1) var(--ease),border-color var(--d1) var(--ease)}
+.flags label:has(input:checked){background:var(--brand-soft);border-color:color-mix(in srgb,var(--brand) 30%,transparent);color:var(--brand)}
+.flags input{appearance:none;-webkit-appearance:none;width:15px;height:15px;border-radius:5px;border:1.5px solid var(--text-3);margin:0;flex:0 0 auto;position:relative;transition:background var(--d1) var(--ease),border-color var(--d1) var(--ease)}
+.flags input:checked{background:var(--brand);border-color:var(--brand)}
+.flags input:checked::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.flags label.locked{opacity:.45;cursor:default}
+
+/* ---------- fields ---------- */
+.fieldlabel{display:block;font-size:11.5px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:7px}
+.entry{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--hairline);border-radius:var(--r-sm);padding:0 6px 0 12px;transition:border-color var(--d1) var(--ease)}
+.entry:focus-within{border-color:var(--brand)}
+.entry input{flex:1;min-width:0;border:0;background:transparent;font-size:14px;padding:11px 0;font-family:var(--mono);letter-spacing:-.01em}
+.entry input:focus{outline:none}
+.entrybtn{width:32px;height:32px;display:grid;place-items:center;border-radius:8px;color:var(--text-3)}
+.entrybtn svg{width:16px;height:16px}
+.entrybtn:hover{background:var(--surface-3);color:var(--text)}
+.entrytools{display:flex;align-items:center;gap:var(--sp-2);margin-top:var(--sp-3);flex-wrap:wrap}
+.fieldnote{font-size:12px;color:var(--text-3);margin-top:var(--sp-2);line-height:1.45}
+textarea,.field input,.field select,.field textarea{display:block;width:100%;border:1px solid var(--hairline);background:var(--surface-2);border-radius:var(--r-sm);padding:11px 12px;font-size:14px;color:var(--text)}
+textarea:focus,.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--brand)}
+textarea,.field textarea{font-family:var(--mono);font-size:13px;line-height:1.5;resize:vertical}
+.field{display:block;margin:var(--sp-4) 0 0}
+.field>span{display:block;font-size:11.5px;font-weight:650;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:7px}
+.field.row-inline{display:flex;align-items:center;gap:10px}
+.hintline{font-size:12px;color:var(--text-3);margin-top:var(--sp-2);line-height:1.5}
+.hintline.bad{color:var(--rose)}
+.apply{width:100%;height:46px;margin-top:var(--sp-5);border-radius:var(--r-sm);background:var(--brand);color:#fff;font-size:14.5px;font-weight:650;display:flex;align-items:center;justify-content:center;gap:8px}
+.apply:disabled{opacity:.45}
+.dismiss{display:flex;align-items:center;gap:10px;width:100%;padding:13px var(--sp-4);border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--hairline);font-size:14px;font-weight:550;text-align:left;margin-top:var(--sp-2);transition:background var(--d1) var(--ease)}
+.dismiss:hover{background:var(--surface-3)}
+.dismiss:disabled{opacity:.42;pointer-events:none}
+.dismiss svg{width:17px;height:17px;color:var(--text-3);flex:0 0 auto}
+
+/* ---------- segmented / chips ---------- */
+.segmented{display:flex;gap:3px;padding:3px;background:var(--seg-track);border:1px solid var(--hairline);border-radius:var(--r-sm)}
+.seg{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:9px;font-size:13px;font-weight:600;color:var(--text-2);transition:background var(--d2) var(--ease),color var(--d2) var(--ease)}
+.seg svg{width:14px;height:14px}
+.seg.is-on{background:var(--seg-on);color:var(--text);box-shadow:var(--sh1)}
+.chiprow{display:flex;gap:var(--sp-2);margin:var(--sp-3) 0;flex-wrap:wrap}
+.fchip{height:28px;padding:0 12px;border-radius:var(--r-full);font-size:12px;font-weight:600;background:var(--surface-2);border:1px solid var(--hairline);color:var(--text-2);transition:background var(--d1) var(--ease),color var(--d1) var(--ease)}
+.fchip.is-on{background:var(--brand-soft);color:var(--brand);border-color:color-mix(in srgb,var(--brand) 28%,transparent)}
+.toolbar{display:flex;align-items:center;gap:var(--sp-2)}
+.searchbox{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--hairline);border-radius:var(--r-sm);padding:0 11px;height:36px}
+.searchbox svg{width:15px;height:15px;color:var(--text-3);flex:0 0 auto}
+.searchbox input{flex:1;min-width:0;border:0;background:transparent;font-size:13.5px;padding:0}
+.searchbox input:focus{outline:none}
+.searchbox input::-webkit-search-cancel-button{-webkit-appearance:none}
+
+/* ---------- terminal ---------- */
+.terminal{max-height:min(46dvh,420px);overflow:auto;overscroll-behavior:contain;padding:var(--sp-2) 0;font-size:12.5px}
+.terminal:empty::after{content:"No events yet.";display:block;padding:var(--sp-5);text-align:center;color:var(--text-3);font-size:13px}
+.event{display:grid;grid-template-columns:auto auto 1fr;align-items:baseline;gap:8px;padding:6px var(--sp-4);border-bottom:1px solid var(--hairline);overflow-wrap:anywhere;line-height:1.45}
+.event:last-child{border-bottom:0}
+.event time{font-family:var(--mono);font-size:11px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.event b{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--text-3);background:var(--surface-3);padding:2px 5px;border-radius:5px}
+.event .msg{color:var(--text-2)}
+.event[data-kind=ok]{background:color-mix(in srgb,var(--jade) 6%,transparent)}
+.event[data-kind=ok] b{background:var(--jade-soft);color:var(--jade)}
+.event[data-kind=ok] .msg{color:var(--text)}
+.event[data-kind=bad]{background:color-mix(in srgb,var(--rose) 7%,transparent);box-shadow:inset 2px 0 0 var(--rose)}
+.event[data-kind=bad] b{background:var(--rose-soft);color:var(--rose)}
+.event[data-kind=bad] .msg{color:var(--text)}
+.event .ip{color:var(--violet)}
+.event .host{color:var(--brand)}
+.footnote{display:flex;align-items:center;gap:7px;margin-top:var(--sp-3);font-size:11.5px;color:var(--text-3);overflow-wrap:anywhere}
+.footnote svg{width:13px;height:13px;flex:0 0 auto}
+
+/* ---------- chart ---------- */
+.chartcard{position:relative;padding:var(--sp-3)}
+.chartcard canvas{width:100%;height:160px;display:block}
+.chartempty{position:absolute;inset:0;display:grid;place-items:center;font-size:12.5px;color:var(--text-3);pointer-events:none}
+.legend{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-3);font-weight:600}
+.lg{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:3px}
+.lg.dl{background:var(--jade)}
+.lg.ul{background:var(--brand)}
+
+/* ---------- vault / history cards ---------- */
+.plist{display:flex;flex-direction:column;gap:var(--sp-2)}
+.pcard{display:flex;align-items:center;gap:var(--sp-3);padding:11px var(--sp-3);background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);box-shadow:var(--sh1);transition:border-color var(--d1) var(--ease),background var(--d1) var(--ease)}
+.pcard.is-on{border-color:color-mix(in srgb,var(--brand) 45%,transparent);background:color-mix(in srgb,var(--brand) 5%,var(--surface))}
+.pcard .pbody{flex:1;min-width:0;text-align:left}
+.pcard .pn{display:flex;align-items:center;gap:7px;font-size:14.5px;font-weight:650;letter-spacing:-.012em}
+.pcard .ph{display:block;font-size:11.5px;color:var(--text-3);font-family:var(--mono);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcard .pt{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.pcard .pt .chip{height:20px;font-size:10px;padding:0 7px}
+.pcard .pacts{display:flex;gap:2px;flex:0 0 auto}
+.pcard .pacts button{width:32px;height:32px;display:grid;place-items:center;border-radius:9px;color:var(--text-3)}
+.pcard .pacts button:hover{background:var(--surface-3);color:var(--text)}
+.pcard .pacts button svg{width:15px;height:15px}
+.empty{padding:var(--sp-6) var(--sp-4);text-align:center;border:1px dashed var(--hairline-2);border-radius:var(--r-md);color:var(--text-3);font-size:13px;line-height:1.5}
+.hitem{display:flex;align-items:center;gap:var(--sp-3);padding:11px var(--sp-4);border-bottom:1px solid var(--hairline)}
+.hitem:last-child{border-bottom:0}
+.hdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--jade)}
+.hdot.bad{background:var(--rose)}
+.hbody{flex:1;min-width:0}
+.hbody .hn{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hbody .hm{font-size:11.5px;color:var(--text-3);font-variant-numeric:tabular-nums;margin-top:1px}
+.hval{font-size:12px;color:var(--text-2);font-variant-numeric:tabular-nums;text-align:right;flex:0 0 auto}
+
+/* ---------- tabbar ---------- */
+.tabbar{position:absolute;left:0;right:0;bottom:0;z-index:35;display:flex;height:calc(var(--nav-h) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--bg);border-top:1px solid var(--hairline)}
+.tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--text-3);transition:color var(--d2) var(--ease);position:relative}
+.tabbar button svg{width:21px;height:21px;transition:transform var(--d2) var(--ease-out)}
+.tabbar button span{font-size:9.5px;font-weight:650;letter-spacing:.01em}
+.tabbar button[aria-current=page]{color:var(--brand)}
+.tabbar button[aria-current=page] svg{transform:translateY(-1px)}
+.tabbar button[aria-current=page]::before{content:"";position:absolute;top:0;width:22px;height:2px;border-radius:0 0 2px 2px;background:var(--brand)}
+.tabbar button:active svg{transform:scale(.9)}
+
+/* ---------- toast ---------- */
+.toast{position:absolute;left:50%;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);transform:translate(-50%,16px);z-index:60;max-width:calc(100% - 40px);padding:11px 16px;border-radius:var(--r-full);background:var(--surface-3);border:1px solid var(--hairline-2);box-shadow:var(--sh2);font-size:13px;font-weight:550;opacity:0;pointer-events:none;transition:opacity var(--d2) var(--ease),transform var(--d2) var(--ease-out);text-align:center}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+.toast[data-tone=bad]{background:var(--rose-soft);border-color:color-mix(in srgb,var(--rose) 34%,transparent);color:var(--rose)}
+.toast[data-tone=good]{background:var(--jade-soft);border-color:color-mix(in srgb,var(--jade) 34%,transparent);color:var(--jade)}
+
+/* ---------- dialogs ---------- */
+dialog{color:var(--text);background:var(--surface);border:0;padding:0;max-height:88dvh}
+dialog::backdrop{background:var(--scrim);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+#sheet{width:min(100%,var(--max-w));margin:auto auto 0;border-radius:var(--r-lg) var(--r-lg) 0 0;border-top:1px solid var(--hairline-2);box-shadow:var(--sh3);padding:0 var(--sp-5) calc(var(--sp-6) + env(safe-area-inset-bottom));overflow-y:auto;animation:sheetIn var(--d3) var(--ease-out)}
+@keyframes sheetIn{from{transform:translateY(22px);opacity:.4}to{transform:none;opacity:1}}
+@media (min-width:900px){#sheet{margin:auto;border-radius:var(--r-lg);border:1px solid var(--hairline-2);max-width:430px}}
+.sheetgrip{width:36px;height:4px;border-radius:2px;background:var(--hairline-2);margin:10px auto 2px}
+.dialoghead{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);padding:var(--sp-2) 0 var(--sp-4);position:sticky;top:0;background:var(--surface);z-index:2}
+.dialoghead h2{font-size:18px;font-weight:700;letter-spacing:-.02em}
+#body{padding-bottom:4px}
+#drawer{position:fixed;inset:0 auto 0 0;margin:0;height:100dvh;max-height:100dvh;width:min(84vw,310px);border-radius:0 var(--r-lg) var(--r-lg) 0;padding:0 var(--sp-4) var(--sp-4);overflow-y:auto;animation:drawIn var(--d3) var(--ease-out)}
+@keyframes drawIn{from{transform:translateX(-18px);opacity:.5}to{transform:none;opacity:1}}
+.drawtop{display:flex;flex-direction:column;gap:3px;padding:calc(env(safe-area-inset-top) + 24px) 4px var(--sp-4)}
+.drawtop .logo{margin-bottom:8px}
+.drawtop strong{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.drawtop small{font-size:12px;color:var(--text-3)}
+#links{display:flex;flex-direction:column;gap:2px;padding-bottom:var(--sp-4);border-bottom:1px solid var(--hairline);margin-bottom:var(--sp-3)}
+#links button{display:flex;align-items:center;gap:10px;width:100%;padding:11px 10px;border-radius:var(--r-sm);font-size:14px;font-weight:550;text-align:left;transition:background var(--d1) var(--ease)}
+#links button:hover{background:var(--surface-2)}
+#links button:disabled{opacity:.4;pointer-events:none}
+#links button svg{width:17px;height:17px;color:var(--text-3);flex:0 0 auto}
+
+/* ---------- collapsible ---------- */
+.fold{border:1px solid var(--hairline);border-radius:var(--r-md);background:var(--surface-2);overflow:hidden;margin-top:var(--sp-3)}
+.fold>summary{display:flex;align-items:center;gap:10px;padding:13px var(--sp-4);cursor:pointer;list-style:none;font-size:14px;font-weight:600}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary .fi{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--surface-3);color:var(--text-2);flex:0 0 auto}
+.fold>summary .fi svg{width:15px;height:15px}
+.fold>summary .ft{flex:1;min-width:0}
+.fold>summary .ft small{display:block;font-size:11.5px;font-weight:400;color:var(--text-3);margin-top:1px}
+.fold>summary .fc{width:16px;height:16px;color:var(--text-3);transition:transform var(--d2) var(--ease)}
+.fold[open]>summary .fc{transform:rotate(180deg)}
+.fold[open]>summary{border-bottom:1px solid var(--hairline)}
+.foldbody{padding:var(--sp-2) var(--sp-4) var(--sp-4)}
+
+@media (max-width:360px){
+  .scroll{padding-left:var(--sp-4);padding-right:var(--sp-4)}
+  .dial{width:188px;height:188px}
+  .dial .core{width:136px;height:136px}
+  .dial .halo,.dial .pulsering{width:152px;height:152px}
+  .stat .v{font-size:20px}
+  .qa span{font-size:10px}
+}
+/* Short screens (landscape, split-screen, large font scale): shrink the dial
+   instead of pushing the stats off the first paint. */
+@media (max-height:720px){
+  .dial{width:170px;height:170px}
+  .dial .core{width:124px;height:124px}
+  .dial .halo,.dial .pulsering{width:138px;height:138px}
+  .dial .glyph{width:26px;height:26px;margin-bottom:3px}
+}
+
+
+/* ---- preview chrome (not shipped in the APK) ---- */
+.previewbar{
+  position:fixed;inset:0 0 auto 0;z-index:200;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:9px 16px;font:500 12.5px/1.45 var(--font);color:var(--text-2);
+  background:var(--surface);border-bottom:1px solid var(--hairline);
+}
+.previewbar strong{color:var(--text);font-weight:650}
+.previewbar b{color:var(--amber);font-weight:600}
+.previewbar code{font:600 11.5px var(--mono);color:var(--brand-400);background:var(--surface-3);padding:1px 5px;border-radius:5px}
+.pb-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 4px var(--amber-soft);flex:0 0 auto}
+.pb-sep{color:var(--text-3)}
+/* The shipped stylesheet gives #app the whole viewport; give the banner its
+   slice back so the tab bar still lands on the bottom edge of the frame. */
+body{padding-top:42px}
+#app{height:calc(100dvh - 42px)}
+@media (min-width:900px){body{padding:62px 0 26px}#app{height:min(900px,calc(100dvh - 88px))}}
+@media (max-width:620px){.previewbar span:last-child{display:none}body{padding-top:36px}#app{height:calc(100dvh - 36px)}}
+</style>
+</head>
+<body>
+
+<div class="previewbar">
+  <span class="pb-dot"></span>
+  <strong>Scanner VPN — interactive UI preview</strong>
+  <span class="pb-sep">·</span>
+  <span>Real <code>index.html</code>, <code>style.css</code> and <code>ui.js</code> from the app, driven by a local simulator.
+  <b>All speeds, latencies, byte counts and hostnames on this page are generated in your browser — none of it is a measurement.</b></span>
+</div>
+
+
+
+<svg class="sprite" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2.6 4.6 5.7v5.6c0 4.6 3.1 8.6 7.4 10 4.3-1.4 7.4-5.4 7.4-10V5.7Z"/></symbol>
+<symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.8 6.5a8 8 0 1 0 10.4 0"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12Z"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 10.4 12 3.6l8.5 6.8V20a1 1 0 0 1-1 1h-4.6v-6H9.1v6H4.5a1 1 0 0 1-1-1Z"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 8.5 4.6L12 12.2 3.5 7.6Z"/><path d="m3.5 12.2 8.5 4.6 8.5-4.6"/><path d="m3.5 16.6 8.5 4.6 8.5-4.6"/></symbol>
+<symbol id="i-pulse" viewBox="0 0 24 24"><path d="M2.5 12.5h4L9 6.5l3.5 11 2.5-5h6.5"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><rect x="2.8" y="4.2" width="18.4" height="15.6" rx="2.4"/><path d="m7 10 2.6 2.4L7 14.8"/><path d="M12.6 15.2h4.4"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10"/><path d="M18 7h2"/><path d="M4 12h3"/><path d="M11 12h9"/><path d="M4 17h9"/><path d="M17 17h3"/><circle cx="16" cy="7" r="2.1"/><circle cx="9" cy="12" r="2.1"/><circle cx="15" cy="17" r="2.1"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4.5v13"/><path d="m6.8 12.4 5.2 5.2 5.2-5.2"/><path d="M4.5 20.5h15"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19.5v-13"/><path d="m6.8 11.6 5.2-5.2 5.2 5.2"/><path d="M4.5 3.5h15"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.2V12l3.2 2"/></symbol>
+<symbol id="i-data" viewBox="0 0 24 24"><ellipse cx="12" cy="6.2" rx="7.4" ry="3"/><path d="M4.6 6.2v11.6c0 1.7 3.3 3 7.4 3s7.4-1.3 7.4-3V6.2"/><path d="M4.6 12c0 1.7 3.3 3 7.4 3s7.4-1.3 7.4-3"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.3A8.4 8.4 0 0 1 9.7 4a8.6 8.6 0 1 0 10.3 10.3Z"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
+<symbol id="i-caret" viewBox="0 0 24 24"><path d="m9.5 5.5 6.5 6.5-6.5 6.5"/></symbol>
+<symbol id="i-chevdown" viewBox="0 0 24 24"><path d="m5.5 9 6.5 6.5L18.5 9"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.6" y="8.6" width="11.6" height="11.6" rx="2.2"/><path d="M15.4 5.4a2.2 2.2 0 0 0-2.2-2.2H6a2.2 2.2 0 0 0-2.2 2.2v7.2a2.2 2.2 0 0 0 2.2 2.2"/></symbol>
+<symbol id="i-paste" viewBox="0 0 24 24"><path d="M9 4.5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-12a2 2 0 0 0-2-2h-2"/><rect x="9" y="2.6" width="6" height="3.8" rx="1.3"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.6 12S6 5.8 12 5.8 21.4 12 21.4 12 18 18.2 12 18.2 2.6 12 2.6 12Z"/><circle cx="12" cy="12" r="2.9"/></symbol>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M9.6 5.9A9.4 9.4 0 0 1 12 5.6c6 0 9.4 6.2 9.4 6.2a16 16 0 0 1-2.9 3.7"/><path d="M6.2 7.9A15.7 15.7 0 0 0 2.6 11.8S6 18 12 18a9.3 9.3 0 0 0 3.6-.7"/><path d="m3.4 3.4 17.2 17.2"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.8 6.8h14.4"/><path d="M9.4 6.8V4.9h5.2v1.9"/><path d="M6.7 6.8 7.6 20a1 1 0 0 0 1 .9h6.8a1 1 0 0 0 1-.9l.9-13.2"/><path d="M10.4 10.4v6.8M13.6 10.4v6.8"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M15.6 4.6 19.4 8.4 8.8 19H5v-3.8Z"/><path d="m13.4 6.8 3.8 3.8"/></symbol>
+<symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15.4V3.8"/><path d="m7.8 8 4.2-4.2L16.2 8"/><path d="M4.6 14.6v4a1.8 1.8 0 0 0 1.8 1.8h11.2a1.8 1.8 0 0 0 1.8-1.8v-4"/></symbol>
+<symbol id="i-import" viewBox="0 0 24 24"><path d="M12 3.8v11.6"/><path d="m7.8 11.2 4.2 4.2 4.2-4.2"/><path d="M4.6 14.6v4a1.8 1.8 0 0 0 1.8 1.8h11.2a1.8 1.8 0 0 0 1.8-1.8v-4"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11.4a8 8 0 1 0-.7 4.6"/><path d="M20.2 4.6v6h-6"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M3.6 12h16.8"/><path d="M12 3.4a13 13 0 0 1 0 17.2 13 13 0 0 1 0-17.2Z"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.8" y="10.4" width="14.4" height="9.8" rx="2.2"/><path d="M8.2 10.4V7.8a3.8 3.8 0 0 1 7.6 0v2.6"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="4.2"/><path d="m11 11 9 9"/><path d="m16.5 15.5 2 2M14 18l2 2"/></symbol>
+<symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="6" r="2.6"/><path d="M8.6 18h6a3.4 3.4 0 0 0 0-6.8H9.4a3.4 3.4 0 0 1 0-6.8h6"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11v5.4"/><path d="M12 7.8h.01"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.3 3.9 2.6 17.5a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4.2"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m4.8 12.6 4.8 4.8 9.6-10.8"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m15.6 15.6 4.4 4.4"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M18.3 15.2V10a6.3 6.3 0 1 0-12.6 0v5.2L4 17.6h16Z"/><path d="M10 20.4a2.2 2.2 0 0 0 4 0"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.6 6.6a1.8 1.8 0 0 1 1.8-1.8h3.4l2 2.6h7.8a1.8 1.8 0 0 1 1.8 1.8v8.2a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8Z"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M9.4 3.4v6L4.2 18a2 2 0 0 0 1.7 3h12.2a2 2 0 0 0 1.7-3l-5.2-8.6v-6"/><path d="M8.2 3.4h7.6"/><path d="M6.6 14.6h10.8"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M3.8 11.4a8.2 8.2 0 1 1 2.4 6.2"/><path d="M3.6 20v-5.4h5.4"/><path d="M12 7.6V12l3 1.8"/></symbol>
+</defs></svg>
+
+<div id="app">
+
+  <header class="topbar" id="topbar">
+    <div class="brandmark">
+      <span class="logo"><svg><use href="#i-shield"/></svg></span>
+      <span class="wordmark">Scanner<span>VPN</span></span>
+    </div>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="themeToggle" aria-label="Switch theme"><svg><use href="#i-moon" id="themeIcon"/></svg></button>
+    <button class="iconbtn" id="menu" aria-label="Open menu"><svg><use href="#i-menu"/></svg></button>
+  </header>
+
+  <div class="scroll" id="scroll">
+
+  <!-- ══════════════════ HOME ══════════════════ -->
+  <section id="home" class="view is-active">
+    <div class="hero">
+      <div class="statusline">
+        <span class="statusdot"></span>
+        <span class="statustext" id="statusText">Disconnected</span>
+      </div>
+
+      <button class="dial" id="connect" data-state="idle" aria-label="Connect">
+        <svg class="ring" viewBox="0 0 232 232" aria-hidden="true">
+          <circle class="track" cx="116" cy="116" r="110"/>
+          <circle class="arc" id="arc" cx="116" cy="116" r="110"/>
+        </svg>
+        <span class="halo"></span><span class="pulsering"></span>
+        <span class="core">
+          <span class="glyph"><svg><use href="#i-power" id="dialIcon"/></svg></span>
+          <span class="label" id="dialLabel">CONNECT</span>
+          <span class="sub" id="dialSub">Tap to start</span>
+        </span>
+      </button>
+      <p class="dial-hint" id="status" role="status"></p>
+
+      <button class="profile-pill" id="profilePill">
+        <span class="avatar" id="pillAvatar">–</span>
+        <span class="meta">
+          <span class="nm truncate" id="pillName">No profile selected</span>
+          <span class="hs truncate" id="pillHost">Choose or create an SSH profile</span>
+        </span>
+        <span class="caret"><svg><use href="#i-caret"/></svg></span>
+      </button>
+    </div>
+
+    <div id="alert" class="alert hidden" role="status">
+      <svg class="ai"><use href="#i-info"/></svg>
+      <span class="at" id="hint"></span>
+      <button class="ax" id="alertClose" aria-label="Dismiss"><svg><use href="#i-close"/></svg></button>
+    </div>
+
+    <div class="section">
+      <div class="stat-grid">
+        <div class="stat dl">
+          <span class="k"><svg><use href="#i-down"/></svg>DOWNLOAD</span>
+          <span class="v num" id="dlRate">0.0<span class="u">kB/s</span></span>
+          <canvas id="dlSpark" width="200" height="34"></canvas>
+        </div>
+        <div class="stat ul">
+          <span class="k"><svg><use href="#i-up"/></svg>UPLOAD</span>
+          <span class="v num" id="ulRate">0.0<span class="u">kB/s</span></span>
+          <canvas id="ulSpark" width="200" height="34"></canvas>
+        </div>
+        <div class="stat">
+          <span class="k"><svg><use href="#i-clock"/></svg>DURATION</span>
+          <span class="v num" id="homeDuration">--:--</span>
+        </div>
+        <div class="stat">
+          <span class="k"><svg><use href="#i-data"/></svg>SESSION DATA</span>
+          <span class="v num" id="homeData">0<span class="u">B</span></span>
+        </div>
+      </div>
+      <p class="hidden" id="rates"></p><p class="hidden" id="rtt"></p>
+    </div>
+
+    <div class="section">
+      <div class="qa-row">
+        <button class="qa" id="qaReconnect"><svg><use href="#i-refresh"/></svg><span>Reconnect</span></button>
+        <button class="qa" id="qaTest"><svg><use href="#i-flask"/></svg><span>Test</span></button>
+        <button class="qa" id="qaConfig"><svg><use href="#i-sliders"/></svg><span>Configure</span></button>
+        <button class="qa" id="qaLogs"><svg><use href="#i-terminal"/></svg><span>Logs</span></button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Connection</span></div>
+      <div class="card rows" id="connInfo"></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ PROFILES ══════════════════ -->
+  <section id="profiles" class="view">
+    <div class="section" style="margin-top:var(--sp-4)">
+      <div class="section-head">
+        <span class="section-title">Saved profiles</span><span class="spacer"></span>
+        <button class="linkbtn" id="vaultImport">Import</button>
+        <button class="linkbtn" id="vaultExport">Export</button>
+      </div>
+      <div id="vaultList"></div>
+      <button class="btn btn-ghost btn-block" id="vaultAdd" style="margin-top:var(--sp-3)"><svg><use href="#i-plus"/></svg>New SSH profile</button>
+    </div>
+
+    <div class="section account" id="accountBlock">
+      <div class="section-head"><span class="section-title">Connection line</span></div>
+      <div class="card card-pad">
+        <label class="fieldlabel" for="account">SSH account · host:port@user:password</label>
+        <div class="entry">
+          <input id="account" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="host:port@username:password">
+          <button id="reveal" class="entrybtn" aria-label="Show account"><svg><use href="#i-eye"/></svg></button>
+        </div>
+        <div class="entrytools">
+          <button id="paste" class="btn btn-ghost btn-sm"><svg><use href="#i-paste"/></svg>Paste</button>
+          <button id="copy" class="btn btn-ghost btn-sm"><svg><use href="#i-copy"/></svg>Copy</button>
+          <span class="spacer"></span>
+          <button id="accountSave" class="btn btn-ghost btn-sm"><svg><use href="#i-plus"/></svg>Save as profile</button>
+        </div>
+        <label class="switchrow" for="remember">
+          <span class="sl"><span class="st">Remember on this device</span><span class="ss">Stored encrypted with the Android keystore</span></span>
+          <input type="checkbox" id="remember" class="switch">
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Configuration</span><span class="spacer"></span>
+        <span class="chip brand" id="profile">SSH</span>
+      </div>
+      <div class="card card-pad">
+        <div id="flags" class="flags"></div>
+      </div>
+      <div class="card rows" id="quicktools" style="margin-top:var(--sp-3)"></div>
+      <button class="btn btn-ghost btn-block" id="edit" style="margin-top:var(--sp-3)"><svg><use href="#i-edit"/></svg>Open full editor</button>
+    </div>
+  </section>
+
+  <!-- ══════════════════ MONITOR ══════════════════ -->
+  <section id="monitor" class="view">
+    <div class="section" style="margin-top:var(--sp-4)">
+      <div class="section-head"><span class="section-title">Throughput · last 60 s</span><span class="spacer"></span>
+        <span class="legend"><i class="lg dl"></i>Down <i class="lg ul"></i>Up</span>
+      </div>
+      <div class="card card-pad chartcard">
+        <canvas id="bigChart" width="760" height="320"></canvas>
+        <div class="chartempty" id="chartEmpty">No traffic samples yet</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="stat-grid">
+        <div class="stat"><span class="k"><svg><use href="#i-pulse"/></svg>LATENCY</span><span class="v num" id="mLatency">—</span></div>
+        <div class="stat"><span class="k"><svg><use href="#i-clock"/></svg>UPTIME</span><span class="v num" id="mUptime">--:--</span></div>
+        <div class="stat"><span class="k"><svg><use href="#i-down"/></svg>RECEIVED</span><span class="v num" id="mRecv">0<span class="u">B</span></span></div>
+        <div class="stat"><span class="k"><svg><use href="#i-up"/></svg>SENT</span><span class="v num" id="mSent">0<span class="u">B</span></span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Session</span></div>
+      <div class="card rows" id="sessionInfo"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Connection history</span><span class="spacer"></span>
+        <button class="linkbtn danger" id="histClear">Clear</button>
+      </div>
+      <div id="histList"></div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ LOGS ══════════════════ -->
+  <section id="log" class="view">
+    <div class="section" style="margin-top:var(--sp-4)">
+      <div class="segmented" id="logSeg">
+        <button class="seg is-on" data-seg="session">Session log</button>
+        <button class="seg" data-seg="checks">Reachability</button>
+      </div>
+    </div>
+
+    <div id="segSession">
+      <div class="section">
+        <div class="toolbar">
+          <div class="searchbox">
+            <svg><use href="#i-search"/></svg>
+            <input id="logFilter" type="search" placeholder="Filter events" autocomplete="off" spellcheck="false">
+          </div>
+          <button id="stop" class="btn btn-danger btn-sm" hidden>Disconnect</button>
+        </div>
+        <div class="chiprow" id="logLevels">
+          <button class="fchip is-on" data-kind="all">All</button>
+          <button class="fchip" data-kind="bad">Errors</button>
+          <button class="fchip" data-kind="ok">Success</button>
+        </div>
+        <div class="card terminal" id="events"></div>
+        <div class="toolbar" style="margin-top:var(--sp-3)">
+          <button id="copyLog" class="btn btn-ghost btn-sm"><svg><use href="#i-copy"/></svg>Copy</button>
+          <button id="exportLog" class="btn btn-ghost btn-sm"><svg><use href="#i-export"/></svg>Export</button>
+          <span class="spacer"></span>
+          <button id="clearLog" class="btn btn-ghost btn-sm"><svg><use href="#i-trash"/></svg>Clear</button>
+        </div>
+        <p class="footnote"><svg><use href="#i-folder"/></svg><span class="storage"></span></p>
+      </div>
+    </div>
+
+    <div id="batch" hidden>
+      <div class="section">
+        <div class="card card-pad">
+          <label class="fieldlabel" for="domains">Target domains</label>
+          <textarea rows="4" id="domains" maxlength="65536" placeholder="One saved server domain per line"></textarea>
+          <div class="entrytools">
+            <button id="savedHosts" class="btn btn-ghost btn-sm">Saved domains</button>
+            <button id="import" class="btn btn-ghost btn-sm"><svg><use href="#i-import"/></svg>Import .txt</button>
+          </div>
+          <p class="fieldnote" id="count"></p>
+          <button class="btn btn-primary btn-block" id="run" style="margin-top:var(--sp-3)">CONNECT BATCH</button>
+          <p class="fieldnote" id="progress" role="status"></p>
+        </div>
+        <div class="card terminal" id="checks" style="margin-top:var(--sp-3)"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════ SETTINGS ══════════════════ -->
+  <section id="settings" class="view">
+    <div class="section" style="margin-top:var(--sp-4)">
+      <div class="section-head"><span class="section-title">Appearance</span></div>
+      <div class="card card-pad">
+        <div class="segmented" id="themeSeg">
+          <button class="seg" data-theme="light"><svg><use href="#i-sun"/></svg>Light</button>
+          <button class="seg" data-theme="dark"><svg><use href="#i-moon"/></svg>Dark</button>
+          <button class="seg" data-theme="system">System</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Connection</span></div>
+      <div class="card rows" id="setConnection"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Privacy &amp; display</span></div>
+      <div class="card rows" id="setDisplay"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">Diagnostics</span></div>
+      <div class="card rows" id="setDiag"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="section-title">About</span></div>
+      <div class="card rows" id="setAbout"></div>
+    </div>
+  </section>
+
+  </div><!-- /scroll -->
+
+  <nav class="tabbar" id="tabbar">
+    <button data-view="home" aria-current="page"><svg><use href="#i-home"/></svg><span>Home</span></button>
+    <button data-view="profiles"><svg><use href="#i-layers"/></svg><span>Profiles</span></button>
+    <button data-view="monitor"><svg><use href="#i-pulse"/></svg><span>Monitor</span></button>
+    <button data-view="log"><svg><use href="#i-terminal"/></svg><span>Logs</span></button>
+    <button data-view="settings"><svg><use href="#i-sliders"/></svg><span>Settings</span></button>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<dialog id="drawer">
+  <div class="drawtop">
+    <span class="logo"><svg><use href="#i-shield"/></svg></span>
+    <strong>Scanner VPN</strong>
+    <small>Quick actions</small>
+  </div>
+  <div id="links"></div>
+  <button id="closeMenu" class="dismiss">Close</button>
+</dialog>
+
+<dialog id="sheet">
+  <div class="sheetgrip"></div>
+  <div class="dialoghead"><h2 id="title"></h2><button id="dismiss" class="iconbtn" aria-label="Close"><svg><use href="#i-close"/></svg></button></div>
+  <div id="body"></div>
+</dialog>
+
+
+<script>
+
+/* ====================================================================
+   PREVIEW SIMULATOR — not part of the Android app.
+   Stands in for the Kotlin `Client` JavascriptInterface so this single
+   file runs in a desktop browser. Every number below is generated here,
+   locally and at random: nothing in this preview is a real measurement.
+   The shipped app reads the same fields from LiveState.snapshot().
+   ==================================================================== */
+(function () {
+  const now = () => Date.now();
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('svpn.' + k); return v === null ? d : v; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('svpn.' + k, v); } catch (e) {} }
+  };
+
+  const pad = n => String(n).padStart(2, '0');
+  const hhmmss = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+
+  const M = {
+    state: 'Idle', batch: false, since: 0, up: 0, down: 0, sent: 0, recv: 0, latency: -1,
+    log: [], checks: [], total: 0, completed: 0, profiles: new Map(), chosen: '',
+    debugFile: 'Scanner/debug.txt (preview — nothing is written)',
+    prefs: { privateScreen: false, keepAwake: false, followLogs: true, showRates: true },
+    timer: 0, phase: 0
+  };
+  function log(tag, text, batch) {
+    const list = batch ? M.checks : M.log;
+    if (list.length >= 100) list.shift();
+    list.push(`${hhmmss()}  ${tag}  ${text}`);
+  }
+  function profile(raw) {
+    const p = JSON.parse(raw);
+    const label = `${p.mode} · ${p.host}:${p.port}`;
+    M.profiles.set(label, p); M.chosen = label; return label;
+  }
+
+  /* ---- simulated tunnel lifecycle ------------------------------------ */
+  function startup() {
+    const p = M.profiles.get(M.chosen); if (!p) return;
+    M.state = 'Starting'; M.phase = 0;
+    log('START', M.chosen);
+    const steps = [
+      ['DNS', `${p.host} → 203.0.113.' + (10 + Math.floor(Math.random() * 40))`],
+      ['SSH', `Opening ${p.mode} session to ${p.host}:${p.port}; verifying pinned host key`],
+      ['PEER', 'SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13'],
+      ['KEX', 'curve25519-sha256'],
+      ['CIPHER', 'Upload chacha20-poly1305@openssh.com · download chacha20-poly1305@openssh.com'],
+      ['AUTH', 'SSH password accepted; local forwarding adapter ready'],
+      ['VPN', `Installing default IPv4 route · DNS ${p.dns}`],
+      ['TUN', `Android interface active; checking outbound through ${p.host}:${p.port}`]
+    ];
+    steps.forEach((s, i) => setTimeout(() => {
+      if (M.state !== 'Starting') return;
+      log(s[0], s[0] === 'DNS' ? `${p.host} → 203.0.113.${10 + Math.floor(Math.random() * 40)}` : s[1]);
+    }, 220 + i * 230));
+    setTimeout(() => {
+      if (M.state !== 'Starting') return;
+      M.latency = 38 + Math.floor(Math.random() * 90);
+      M.state = 'Connected'; M.since = now(); M.sent = 0; M.recv = 0;
+      log('ONLINE', `Verified ${M.chosen} · ${M.latency} ms`);
+      clearInterval(M.timer); M.timer = setInterval(tick, 1000);
+    }, 2300);
+  }
+  function tick() {
+    if (M.state !== 'Connected') return;
+    M.phase += 0.35;
+    const burst = Math.max(0, Math.sin(M.phase) * 0.6 + Math.random() * 0.8);
+    M.down = +(140 * burst + 18 + Math.random() * 30).toFixed(1);
+    M.up = +(26 * burst + 4 + Math.random() * 9).toFixed(1);
+    M.recv += Math.round(M.down * 1024); M.sent += Math.round(M.up * 1024);
+    if (Math.random() < 0.05) M.latency = 38 + Math.floor(Math.random() * 90);
+  }
+  function shutdown() {
+    if (!['Starting', 'Connected'].includes(M.state)) return;
+    M.state = 'Stopping';
+    setTimeout(() => {
+      clearInterval(M.timer); M.timer = 0;
+      M.up = M.down = 0; M.sent = M.recv = 0; M.since = 0; M.latency = -1;
+      log('STOP', 'Tunnel closed'); M.state = 'Idle';
+    }, 900);
+  }
+
+  function note(text) {
+    const t = document.getElementById('toast');
+    if (!t) return; t.textContent = text; t.classList.add('is-on');
+    clearTimeout(note.t); note.t = setTimeout(() => t.classList.remove('is-on'), 2200);
+  }
+
+  window.Client = {
+    /* ---- persistence (keystore-backed on Android, localStorage here) -- */
+    uiState: () => store.get('ui', ''),
+    saveUiState: j => { store.set('ui', j); return true; },
+    vaultLoad: () => store.get('vault', ''),
+    vaultSave: j => { store.set('vault', j); return true; },
+    rememberSsh: raw => { store.set('draft', raw); return true; },
+    rememberedSsh: () => store.get('draft', ''),
+    forgetSsh: () => { store.set('draft', ''); return true; },
+    connectTimeout: () => {},
+    appearance: () => {},
+
+    /* ---- clipboard / documents --------------------------------------- */
+    copyAccount: v => { try { navigator.clipboard.writeText(v); } catch (e) {} },
+    copySessionLog: () => { try { navigator.clipboard.writeText(M.log.join('\n')); } catch (e) {} note('Session log copied'); },
+    pasteAccount: () => setTimeout(() => window.receiveAccount('sg1.example-vpn.net:443@demo-user:Pr3view-Only-Not-Real'), 60),
+    exportText: (name) => note('Preview: “' + name + '” would open the Android file picker'),
+    importProfiles: () => setTimeout(() => window.receiveProfiles(JSON.stringify({
+      app: 'Scanner VPN', format: 'scanner-profiles', version: 1, profiles: [
+        { name: 'Imported · Frankfurt', mode: 'SSH WS TLS', host: 'fra.example-vpn.net', port: 443, user: 'demo', secret: 'preview', path: '/ws', sni: 'cdn.example.net', dns: '9.9.9.9', dns2: '', udpGw: '' },
+        { name: 'Imported · Mumbai', mode: 'SSH TLS', host: 'bom.example-vpn.net', port: 443, user: 'demo', secret: 'preview', path: '/', sni: '', dns: '1.1.1.1', dns2: '1.0.0.1', udpGw: '127.0.0.1:7300' }
+      ]
+    })), 250),
+    importBatch: () => setTimeout(() => window.receiveBatch('sg1.example-vpn.net\nfra.example-vpn.net'), 150),
+    chooseFolder: () => note('Preview: Android would open the folder picker'),
+    stopFile: () => { M.debugFile = 'File logging off (preview)'; },
+
+    /* ---- profiles ----------------------------------------------------- */
+    selectedAccount: () => { const p = M.profiles.get(M.chosen); return p && p.mode.startsWith('SSH') ? `${p.host}:${p.port}@${p.user}:${p.secret}` : ''; },
+    save: raw => { try { profile(raw); return true; } catch (e) { return false; } },
+    choose: key => { if (M.profiles.has(key)) M.chosen = key; },
+    enrollSsh: raw => setTimeout(() => {
+      try { const label = profile(raw); log('PROFILE', 'SSH profile selected.'); window.sshResult('SSH profile selected. (preview — no host key was fetched)', true); }
+      catch (e) { window.sshResult('Check the account format, server, port and username.', false); }
+    }, 850),
+    validPayload: text => /^[A-Z]+\s+\/\S*\s+HTTP\/1\.[01]/.test(text.trim()) && /host:/i.test(text),
+
+    /* ---- lifecycle ----------------------------------------------------- */
+    connect: () => { if (!M.profiles.has(M.chosen) || !['Idle', 'Failed'].includes(M.state)) return; startup(); },
+    disconnect: shutdown,
+    cancel: () => { M.batch = false; },
+
+    /* ---- diagnostics ---------------------------------------------------- */
+    checks: () => {
+      if (M.batch || !M.profiles.has(M.chosen)) return false;
+      M.batch = true; M.checks = []; M.total = 1; M.completed = 0;
+      log('START', M.chosen, true);
+      setTimeout(() => { log('VERIFIED', `${M.chosen.split(' · ')[1]} · HTTPS via profile · ${60 + Math.floor(Math.random() * 120)} ms (preview)`, true); M.completed = 1; M.batch = false; }, 1500);
+      return true;
+    },
+    checkList: text => {
+      const hosts = [...new Set(text.trim().toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+      if (!hosts.length || M.batch) return false;
+      M.batch = true; M.checks = []; M.total = hosts.length; M.completed = 0;
+      hosts.forEach((h, i) => setTimeout(() => {
+        log('START', h, true);
+        setTimeout(() => {
+          if (Math.random() < 0.25) log('FAILED', `${h} · The server did not answer in time. (preview)`, true);
+          else log('VERIFIED', `${h} · HTTPS via profile · ${60 + Math.floor(Math.random() * 160)} ms (preview)`, true);
+          M.completed++; if (M.completed >= M.total) M.batch = false;
+        }, 700);
+      }, i * 950));
+      return true;
+    },
+
+    /* ---- state ---------------------------------------------------------- */
+    preferences: () => JSON.stringify(M.prefs),
+    preference: (k, v) => { M.prefs[k] = v; },
+    clearSessionLog: () => { M.log = []; },
+    snapshot: () => {
+      const p = M.profiles.get(M.chosen);
+      return JSON.stringify({
+        debugFile: M.debugFile, state: M.state,
+        activeDns: p ? p.dns : '', activeSni: p ? (p.sni || '') : '', activeDns2: p ? (p.dns2 || '') : '',
+        activeUdp: p ? (p.udpGw || '') : '', activePayload: p ? (p.payload || '') : '', activePath: p ? (p.path || '/') : '/',
+        active: M.chosen, profiles: [...M.profiles.keys()], log: M.log,
+        total: M.total, completed: M.completed, checks: M.checks, batch: M.batch,
+        latency: M.latency, up: M.up, down: M.down, sent: M.sent, recv: M.recv,
+        elapsed: M.since ? Math.floor((now() - M.since) / 1000) : 0
+      });
+    }
+  };
+
+  /* Seed a demo profile so the preview opens ready to connect. */
+  if (!store.get('draft', '')) store.set('draft', JSON.stringify({
+    mode: 'SSH WS TLS', host: 'sg1.example-vpn.net', port: 443, user: 'demo-user', secret: 'preview-only',
+    path: '/ws', payload: 'GET /ws HTTP/1.1\nHost: cdn.example.net\nConnection: Upgrade\nUpgrade: websocket',
+    sni: 'cdn.example.net', udpGw: '127.0.0.1:7300', dns: '1.1.1.1', dns2: '1.0.0.1'
+  }));
+  if (!store.get('ui', '')) store.set('ui', JSON.stringify({ theme: 'dark', selected: 'demo1', timeout: 10, autoReconnect: true, retries: 3, history: [] }));
+  if (!store.get('vault', '')) store.set('vault', JSON.stringify([
+    { id: 'demo1', name: 'Singapore · WSS', mode: 'SSH WS TLS', host: 'sg1.example-vpn.net', port: 443, user: 'demo-user', secret: 'preview-only', path: '/ws', payload: 'GET /ws HTTP/1.1\nHost: cdn.example.net\nConnection: Upgrade\nUpgrade: websocket', sni: 'cdn.example.net', udpGw: '127.0.0.1:7300', dns: '1.1.1.1', dns2: '1.0.0.1' },
+    { id: 'demo2', name: 'London · direct TLS', mode: 'SSH TLS', host: 'lon.example-vpn.net', port: 443, user: 'demo-user', secret: 'preview-only', path: '/', payload: '', sni: '', udpGw: '', dns: '9.9.9.9', dns2: '' }
+  ]));
+})();
+
+</script>
+<script>
+'use strict';
+/* ============================================================================
+   Scanner VPN — WebView controller.
+
+   Talks to Kotlin only through the `Client` JavascriptInterface declared in
+   LiveActivity.Bridge. Every pre-existing bridge call and signature is kept
+   as-is; methods added in this release are feature-detected through opt(),
+   so the UI still runs if a bridge method is unavailable.
+
+   Values shown on screen come from LiveState.snapshot(). Nothing here
+   invents latency, throughput, duration or byte counters.
+   ============================================================================ */
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const icon = (name, cls) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); if (cls) s.setAttribute('class', cls); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#i-' + name); s.append(u); return s; };
+/** Optional bridge method: returns fallback when the native side does not expose it. */
+const opt = (name, fallback, ...args) => { try { return typeof Client[name] === 'function' ? Client[name](...args) : fallback; } catch (e) { return fallback; } };
+
+/* ─────────────────────────── existing protocol state ─────────────────────── */
+const modes = ['VLESS TLS', 'VLESS WS TLS', 'Trojan TLS', 'VMess WS TLS', 'Shadowsocks', 'HTTP CONNECT TLS', 'SOCKS5 TLS'];
+let s = {}, core = false, ws = false, tls = false, custom = false, dns = '1.1.1.1', path = '/', out = modes[1], pending = false, after = false, view = 'home';
+const drafts = new Map(), prefs = JSON.parse(Client.preferences());
+let udp = false, udpAddr = '127.0.0.1:7300', sni = '', dns2 = '', wire = 'ws', payload = '';
+const template = 'GET / HTTP/1.1\nHost: [host]\nConnection: Upgrade\nUpgrade: websocket';
+const presetEndpoint = 'dei.dozapp.xyz:443';
+const presetPayload = 'GET / HTTP/1.1\nHost: kaylah.ggff.net\nConnection: Upgrade\nUpgrade: websocket\nUser-Agent: Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36';
+
+const mode = () => core ? out : 'SSH' + (ws ? (wire === 'ws' ? ' WS' : ' HTTP') : '') + (tls ? ' TLS' : '');
+const locked = () => pending || s.batch || !['Idle', 'Failed'].includes(s.state);
+const active = () => s.active?.startsWith(mode() + ' · ');
+const okIp = v => /^(\d{1,3}\.){3}\d{1,3}$/.test(v) && v.split('.').every(o => +o <= 255);
+
+/* ─────────────────────────── persisted UI state ──────────────────────────── */
+const DEFAULTS = {
+  theme: 'system',
+  timeout: 10,            // seconds, pushed to LiveState via Client.connectTimeout
+  autoReconnect: false,
+  retries: 3,
+  notify: true,
+  history: []
+};
+let ui = Object.assign({}, DEFAULTS);
+try { Object.assign(ui, JSON.parse(opt('uiState', '{}') || '{}')); } catch (e) { /* first run */ }
+if (!Array.isArray(ui.history)) ui.history = [];
+let saveTimer = 0;
+function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(() => opt('saveUiState', false, JSON.stringify(ui)), 180); }
+
+let vault = [];
+try { vault = JSON.parse(opt('vaultLoad', '[]') || '[]'); } catch (e) { vault = []; }
+if (!Array.isArray(vault)) vault = [];
+function saveVault() { return opt('vaultSave', false, JSON.stringify(vault)) !== false; }
+
+/* ─────────────────────────── formatting ──────────────────────────────────── */
+const UNITS = ['B', 'kB', 'MB', 'GB', 'TB'];
+function bytes(n) { n = Number(n) || 0; let i = 0; while (n >= 1024 && i < UNITS.length - 1) { n /= 1024; i++; } return { v: n >= 100 || i === 0 ? Math.round(n) : n.toFixed(1), u: UNITS[i] }; }
+function rate(kbs) { const n = Number(kbs) || 0; return n >= 1024 ? { v: (n / 1024).toFixed(2), u: 'MB/s' } : { v: n.toFixed(1), u: 'kB/s' }; }
+function dur(sec) { sec = Math.max(0, Math.floor(Number(sec) || 0)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60; const p = v => String(v).padStart(2, '0'); return h ? `${h}:${p(m)}:${p(x)}` : `${p(m)}:${p(x)}`; }
+function stamp(ms) { const d = new Date(ms); const p = v => String(v).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function setStat(node, pair) { node.textContent = pair.v; node.append(el('span', 'u', pair.u)); }
+
+/* ─────────────────────────── toast ───────────────────────────────────────── */
+let toastTimer = 0;
+function toast(text, tone) {
+  const t = $('toast'); t.textContent = text; if (tone) t.dataset.tone = tone; else delete t.dataset.tone;
+  t.classList.add('is-on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('is-on'), 2600);
+}
+
+/* ─────────────────────────── theme ───────────────────────────────────────── */
+const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : { matches: true };
+function resolvedTheme() { return ui.theme === 'system' ? (media.matches ? 'dark' : 'light') : ui.theme; }
+function applyTheme() {
+  const t = resolvedTheme();
+  document.documentElement.dataset.theme = t;
+  $('themeIcon')?.setAttribute('href', t === 'dark' ? '#i-moon' : '#i-sun');
+  opt('appearance', null, t === 'dark');
+  for (const b of $('themeSeg').children) b.classList.toggle('is-on', b.dataset.theme === ui.theme);
+}
+media.addEventListener?.('change', () => { if (ui.theme === 'system') applyTheme(); });
+$('themeToggle').onclick = () => { ui.theme = resolvedTheme() === 'dark' ? 'light' : 'dark'; applyTheme(); persist(); };
+for (const b of $('themeSeg').children) b.onclick = () => { ui.theme = b.dataset.theme; applyTheme(); persist(); };
+
+/* ─────────────────────────── navigation ──────────────────────────────────── */
+const VIEWS = ['home', 'profiles', 'monitor', 'log', 'settings'];
+function page(v) {
+  if (v === 'batch') { v = 'log'; segment('checks'); }
+  if (!VIEWS.includes(v)) v = 'home';
+  view = v;
+  for (const k of VIEWS) $(k).classList.toggle('is-active', k === v);
+  document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-current', b.dataset.view === v ? 'page' : 'false'));
+  $('scroll').scrollTop = 0;
+  if (v === 'monitor') drawChart();
+  if (v === 'profiles') renderVault();
+  if (v === 'settings') renderSettings();
+}
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => page(b.dataset.view));
+$('scroll').addEventListener('scroll', () => $('topbar').classList.toggle('is-stuck', $('scroll').scrollTop > 4), { passive: true });
+
+function segment(name) {
+  for (const b of $('logSeg').children) b.classList.toggle('is-on', b.dataset.seg === name);
+  $('segSession').hidden = name !== 'session';
+  $('batch').hidden = name !== 'checks';
+}
+for (const b of $('logSeg').children) b.onclick = () => segment(b.dataset.seg);
+
+/* ─────────────────────────── dialog helpers (contract preserved) ─────────── */
+function dialog(title) { $('drawer').close(); $('sheet').close(); $('title').textContent = title; $('body').replaceChildren(); $('sheet').showModal(); return $('body'); }
+function btn(root, name, action, off = false) { const b = el('button', null, name); b.disabled = off; b.onclick = action; root.append(b); return b; }
+function field(root, key, value, type = 'text') {
+  const l = el('label', 'field'); l.append(el('span', null, key));
+  const input = el('input'); input.type = type; input.value = value; input.autocomplete = 'off'; input.spellcheck = false; input.setAttribute('autocapitalize', 'none');
+  l.append(input); root.append(l); return input;
+}
+function note(root, text) { const p = el('p', 'hintline', text); root.append(p); return p; }
+function applyButton(root, fn, label) { const b = btn(root, label || 'Apply', fn); b.className = 'apply'; return b; }
+function menuItem(root, name, iconName, action, off = false) { const b = btn(root, '', action, off); b.append(icon(iconName), el('span', null, name)); return b; }
+function sheetRow(root, name, iconName, action, off = false) {
+  const b = btn(root, '', action, off); b.className = 'dismiss';
+  b.append(icon(iconName), el('span', null, name)); return b;
+}
+function confirmSheet(title, message, label, fn) {
+  const root = dialog(title); note(root, message);
+  applyButton(root, fn, label); sheetRow(root, 'Cancel', 'close', () => $('sheet').close());
+}
+
+/* ─────────────────────────── configuration editors ───────────────────────── */
+function sectionEditor(which) {
+  if (locked()) return;
+  if (which === 'account') {
+    const root = dialog('SSH account');
+    const input = field(root, 'host:port@username:password', $('account').value, $('account').type);
+    note(root, 'The account port is used as pasted. Payload, SSL / SNI, DNS and UDPgw are configured separately.');
+    applyButton(root, () => { $('account').value = input.value; $('sheet').close(); paint(); });
+    return;
+  }
+  if (which === 'payload') {
+    const root = dialog('HTTP payload');
+    const l = el('label', 'field'); l.append(el('span', null, 'After HTTP upgrade'));
+    const sel = el('select');
+    sel.add(new Option('Binary WebSocket → SSH', 'ws'));
+    sel.add(new Option('Raw SSH stream (no WebSocket framing)', 'http'));
+    sel.value = wire; l.append(sel); root.append(l);
+
+    const label = el('label', 'field'); label.append(el('span', null, 'Paste one HTTP upgrade request'));
+    const text = el('textarea'); text.value = payload || template; text.rows = 7; text.maxLength = 8192; text.spellcheck = false;
+    label.append(text); root.append(label);
+
+    const tokens = el('div', 'chiprow');
+    for (const [name, insert] of [['[host]', '[host]'], ['[port]', '[port]'], ['[crlf]', '[crlf]'], ['Use template', template]]) {
+      const c = el('button', 'fchip', name);
+      c.onclick = () => { if (insert === template) text.value = template; else { const p = text.selectionStart ?? text.value.length; text.value = text.value.slice(0, p) + insert + text.value.slice(text.selectionEnd ?? p); } text.focus(); };
+      tokens.append(c);
+    }
+    root.append(tokens);
+    note(root, 'Use the provider’s GET path, Host and headers. Line breaks, [crlf] and literal \\r\\n are accepted. [host] uses the TLS name or account host. In binary mode the client adds its own WebSocket key and version. If the provider specifies the binary subprotocol, include Sec-WebSocket-Protocol: binary.');
+    const msg = note(root, '');
+    applyButton(root, () => {
+      if (!Client.validPayload(text.value, sel.value === 'ws')) {
+        msg.textContent = 'Use one GET /path HTTP/1.1 request, Host, Connection: Upgrade and Upgrade: websocket (or ssh for raw). Optional: User-Agent, Origin, X- headers, or Sec-WebSocket-Protocol: binary in binary mode.';
+        msg.className = 'hintline bad'; return;
+      }
+      wire = sel.value; payload = text.value; ws = true; $('sheet').close(); paint();
+    });
+    return;
+  }
+  if (which === 'sni') {
+    const root = dialog('SSL / SNI');
+    const name = field(root, 'TLS server name (SNI)', sni); name.placeholder = 'Blank = account hostname';
+    note(root, 'Connects to the account address. The certificate must be valid for this name.');
+    const msg = note(root, '');
+    applyButton(root, () => {
+      const v = name.value.trim().toLowerCase();
+      if (v && (!/^[a-z0-9.-]+$/.test(v) || v.length > 253 || v.split('.').some(x => !x || x.length > 63 || x.startsWith('-') || x.endsWith('-')))) {
+        msg.textContent = 'Enter only the TLS hostname, without a URL or port.'; msg.className = 'hintline bad'; return;
+      }
+      sni = v; tls = true; $('sheet').close(); paint();
+    });
+    return;
+  }
+  if (which === 'dns') {
+    const root = dialog('Custom DNS');
+    const a = field(root, 'Preferred DNS IPv4', dns), b = field(root, 'Alternate DNS IPv4 (optional)', dns2);
+    const presets = el('div', 'chiprow');
+    for (const [name, p, q] of [['Cloudflare', '1.1.1.1', '1.0.0.1'], ['Google', '8.8.8.8', '8.8.4.4'], ['Quad9', '9.9.9.9', '149.112.112.112']]) {
+      const c = el('button', 'fchip', name); c.onclick = () => { a.value = p; b.value = q; }; presets.append(c);
+    }
+    root.append(presets);
+    note(root, 'These are VPN resolvers, not the initial lookup for the SSH server. With SSH, resolver traffic is forwarded over TCP.');
+    const msg = note(root, '');
+    applyButton(root, () => {
+      if (!okIp(a.value.trim()) || (b.value.trim() && !okIp(b.value.trim()))) { msg.textContent = 'Enter valid IPv4 addresses.'; msg.className = 'hintline bad'; return; }
+      dns = a.value.trim(); dns2 = b.value.trim(); custom = true; $('sheet').close(); paint();
+    });
+    return;
+  }
+  const root = dialog('SSH UDP gateway');
+  const u = field(root, 'Provider UDPgw address and port', udpAddr || '127.0.0.1:7300');
+  note(root, 'Requires badvpn-udpgw on the SSH server. 127.0.0.1 refers to that server, not your phone. Leave off if your provider did not supply a gateway.');
+  const msg = note(root, '');
+  applyButton(root, () => {
+    const v = u.value.trim(), m = /^([\d.]+):(\d{1,5})$/.exec(v);
+    if (!m || !okIp(m[1]) || +m[2] < 1 || +m[2] > 65535) { msg.textContent = 'Enter gateway IPv4:port.'; msg.className = 'hintline bad'; return; }
+    udpAddr = v; udp = true; $('sheet').close(); paint();
+  });
+}
+
+function profileDialog(connect = false) {
+  if (locked()) return;
+  if (!core) {
+    const root = dialog('SSH configuration');
+    note(root, 'Current transport: ' + mode());
+    for (const [name, id, ic] of [['Account line', 'account', 'key'], ['HTTP payload', 'payload', 'route'], ['SSL / SNI', 'sni', 'lock'], ['Custom DNS', 'dns', 'globe'], ['UDP gateway', 'udp', 'bolt']])
+      sheetRow(root, name, ic, () => sectionEditor(id));
+    return;
+  }
+  const root = dialog('Core profile');
+  const l = el('label', 'field'); l.append(el('span', null, 'Protocol and transport'));
+  const sel = el('select'); for (const m of modes) sel.add(new Option(m, m)); sel.value = out; l.append(sel); root.append(l);
+  sel.onchange = () => { out = sel.value; paint(); profileDialog(connect); };
+
+  const d = drafts.get(mode()) || {};
+  const host = field(root, 'Server hostname', d.host || ''), port = field(root, 'Server port', d.port || 443, 'number');
+  const user = /HTTP|SOCKS/.test(out) ? field(root, 'Proxy username', d.user || '') : null;
+  const sec = field(root, /VLESS|VMess/.test(out) ? 'Client UUID' : out === 'Shadowsocks' ? 'Password · chacha20-ietf-poly1305' : 'Password', d.secret || '', 'password');
+  const w = mode().includes(' WS') ? field(root, 'WebSocket path', d.path || '/') : null;
+  const coreName = out.endsWith('TLS') ? field(root, 'TLS server name (blank = server)', d.sni || '') : null;
+  const resolver = custom ? field(root, 'VPN DNS server (IPv4)', dns) : null;
+  const msg = note(root, '');
+  applyButton(root, () => {
+    const nextDns = resolver ? resolver.value.trim() : '1.1.1.1';
+    if (!okIp(nextDns)) { msg.textContent = 'Enter a DNS IPv4 address.'; msg.className = 'hintline bad'; return; }
+    if (w && (!w.value.startsWith('/') || /[\s#]/.test(w.value))) { msg.textContent = 'Enter a path starting with /.'; msg.className = 'hintline bad'; return; }
+    const p = { mode: out, host: host.value.trim(), port: Number(port.value), secret: sec.value, user: user?.value || '', path: w?.value || '/', dns: nextDns, dns2: custom ? dns2 : '', sni: out.endsWith('TLS') ? coreName.value.trim() : '' };
+    if (!Client.save(JSON.stringify(p))) { msg.textContent = 'Check the hostname, port and credential for this protocol.'; msg.className = 'hintline bad'; return; }
+    drafts.set(out, p); dns = nextDns; $('sheet').close(); refresh();
+    if (connect) { Client.connect(); page('log'); }
+  }, connect ? 'Save & connect' : 'Save & select');
+}
+
+/* ─────────────────────────── saved (session) profiles ────────────────────── */
+function useMode(m) { core = !m.startsWith('SSH'); if (core) out = m; else { ws = m.includes(' WS') || m.includes(' HTTP'); wire = m.includes(' HTTP') ? 'http' : 'ws'; tls = m.includes(' TLS'); } }
+function useSaved() {
+  useMode(s.active.split(' · ')[0]);
+  dns = s.activeDns || '1.1.1.1'; dns2 = s.activeDns2 || ''; custom = dns !== '1.1.1.1' || !!dns2;
+  payload = s.activePayload || ''; sni = s.activeSni || ''; udp = !!s.activeUdp; udpAddr = s.activeUdp || '127.0.0.1:7300';
+  if (!core) $('account').value = Client.selectedAccount();
+  path = s.activePath || '/';
+}
+function savedSheet() {
+  const root = dialog('Session profiles');
+  if (!s.profiles.length) { note(root, 'No profiles registered in this session yet. Configure a server, then connect once.'); return; }
+  note(root, 'Profiles accepted by the engine during this app session.');
+  for (const label of s.profiles)
+    sheetRow(root, label, label.startsWith('SSH') ? 'key' : 'globe', () => { Client.choose(label); s = JSON.parse(Client.snapshot()); useSaved(); $('sheet').close(); refresh(); }, locked());
+}
+
+/* ─────────────────────────── profile vault (persistent) ──────────────────── */
+function parseAccount(raw) { return /^([^:@\s]+):(\d{1,5})@([^:\s]+):([\s\S]+)$/.exec((raw || '').trim()); }
+function currentDraft() {
+  const m = parseAccount($('account').value);
+  if (!m) return null;
+  return { mode: mode(), host: m[1], port: +m[2], user: m[3], secret: m[4], path: ws ? path : '/', payload: ws ? payload : '', sni: tls ? sni : '', udpGw: udp ? udpAddr : '', dns2: custom ? dns2 : '', dns: custom ? dns : '1.1.1.1' };
+}
+function vaultApply(p) {
+  useMode(p.mode); sni = p.sni || ''; path = p.path || '/'; payload = p.payload || '';
+  dns = p.dns || '1.1.1.1'; dns2 = p.dns2 || ''; custom = dns !== '1.1.1.1' || !!dns2;
+  udp = !!p.udpGw; udpAddr = p.udpGw || '127.0.0.1:7300';
+  $('account').value = `${p.host}:${p.port}@${p.user}:${p.secret}`;
+  ui.selected = p.id; persist(); paint(); renderVault();
+}
+function vaultSheet(existing, prefill) {
+  const edit = !!existing;
+  const base = existing || prefill || currentDraft() || { mode: mode(), host: '', port: 443, user: '', secret: '', path: ws ? path : '/', payload: ws ? payload : '', sni: tls ? sni : '', udpGw: udp ? udpAddr : '', dns: custom ? dns : '1.1.1.1', dns2: custom ? dns2 : '' };
+  const root = dialog(edit ? 'Edit profile' : 'New SSH profile');
+  const name = field(root, 'Profile name', base.name || (base.host ? base.host : ''));
+  name.placeholder = 'My provider';
+  const host = field(root, 'Server host', base.host || '');
+  const port = field(root, 'Port', base.port || 443, 'number');
+  const user = field(root, 'Username', base.user || '');
+  const known = base.secret || '';
+  const secret = field(root, known ? 'Password (blank keeps the stored one)' : 'Password', '', 'password');
+  secret.placeholder = known ? '••••••••' : '';
+
+  const adv = el('details', 'fold');
+  const sum = el('summary'); sum.append(icon('sliders', 'fi'), (() => { const t = el('span', 'ft', 'Transport details'); t.append(el('small', null, 'SNI, path, payload, DNS, UDPgw')); return t; })(), icon('chevdown', 'fc'));
+  adv.append(sum);
+  const ab = el('div', 'foldbody'); adv.append(ab); root.append(adv);
+  const aMode = (() => { const l = el('label', 'field'); l.append(el('span', null, 'Transport')); const sx = el('select'); for (const m of ['SSH', 'SSH TLS', 'SSH WS', 'SSH WS TLS', 'SSH HTTP', 'SSH HTTP TLS']) sx.add(new Option(m, m)); sx.value = base.mode && base.mode.startsWith('SSH') ? base.mode : 'SSH'; l.append(sx); ab.append(l); return sx; })();
+  const aSni = field(ab, 'SNI (blank = host)', base.sni || '');
+  const aPath = field(ab, 'WebSocket path', base.path || '/');
+  const aPay = (() => { const l = el('label', 'field'); l.append(el('span', null, 'HTTP payload')); const t = el('textarea'); t.rows = 4; t.maxLength = 8192; t.spellcheck = false; t.value = base.payload || ''; l.append(t); ab.append(l); return t; })();
+  const aDns = field(ab, 'Preferred DNS', base.dns || '1.1.1.1');
+  const aDns2 = field(ab, 'Alternate DNS', base.dns2 || '');
+  const aUdp = field(ab, 'UDPgw (blank = off)', base.udpGw || '');
+
+  const msg = note(root, '');
+  applyButton(root, () => {
+    const pw = secret.value || known;
+    const p = {
+      id: existing?.id || ('p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+      name: name.value.trim() || host.value.trim(),
+      mode: aMode.value, host: host.value.trim().toLowerCase(), port: Number(port.value), user: user.value.trim(), secret: pw,
+      path: aPath.value.trim() || '/', payload: aPay.value, sni: aSni.value.trim().toLowerCase(),
+      udpGw: aUdp.value.trim(), dns: aDns.value.trim() || '1.1.1.1', dns2: aDns2.value.trim()
+    };
+    const bad = validate(p);
+    if (bad) { msg.textContent = bad; msg.className = 'hintline bad'; return; }
+    if (edit) vault[vault.findIndex(x => x.id === p.id)] = p; else vault.push(p);
+    if (!saveVault()) { msg.textContent = 'Could not store the profile on this device.'; msg.className = 'hintline bad'; return; }
+    $('sheet').close(); renderVault(); toast(edit ? 'Profile updated' : 'Profile saved', 'good');
+  }, edit ? 'Save changes' : 'Create profile');
+}
+function validate(p) {
+  if (!p.host || p.host.length > 253 || !p.host.split('.').every(x => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(x))) return 'Enter a valid server hostname.';
+  if (!(p.port >= 1 && p.port <= 65535)) return 'Enter a port between 1 and 65535.';
+  if (!p.user || p.user.length > 128) return 'Enter the SSH username.';
+  if (!p.secret) return 'Enter the SSH password.';
+  if (!okIp(p.dns) || (p.dns2 && !okIp(p.dns2))) return 'Enter valid IPv4 DNS addresses.';
+  if (p.mode.includes('WS') && (!p.path.startsWith('/') || /[\s#]/.test(p.path))) return 'Enter a WebSocket path starting with /.';
+  if (p.udpGw) { const m = /^([\d.]+):(\d{1,5})$/.exec(p.udpGw); if (!m || !okIp(m[1]) || +m[2] < 1 || +m[2] > 65535) return 'Enter the UDP gateway as IPv4:port.'; }
+  if (p.sni && !/^[a-z0-9.-]+$/.test(p.sni)) return 'Enter the SNI hostname without a URL or port.';
+  return null;
+}
+function renderVault() {
+  const host = $('vaultList'); host.replaceChildren();
+  if (!vault.length) {
+    host.append(el('div', 'empty', 'No saved profiles yet. Paste an SSH account below and tap “Save as profile”, import a file, or create one manually.'));
+    return;
+  }
+  const list = el('div', 'plist');
+  for (const p of vault) {
+    const card = el('div', 'pcard'); if (ui.selected === p.id) card.classList.add('is-on');
+    const body = el('button', 'pbody');
+    const nm = el('div', 'pn'); nm.append(el('span', null, p.name || p.host));
+    if (ui.selected === p.id) nm.append((() => { const c = el('span', 'chip jade', 'Selected'); return c; })());
+    body.append(nm, el('span', 'ph', `${p.user}@${p.host}:${p.port}`));
+    const tags = el('div', 'pt');
+    tags.append(el('span', 'chip', p.mode));
+    if (p.sni) tags.append(el('span', 'chip', 'SNI ' + p.sni));
+    if (p.udpGw) tags.append(el('span', 'chip', 'UDPgw'));
+    if (p.dns && p.dns !== '1.1.1.1') tags.append(el('span', 'chip', 'DNS ' + p.dns));
+    body.append(tags);
+    body.onclick = () => { if (locked()) { toast('Stop the active session first'); return; } vaultApply(p); toast('Profile selected', 'good'); };
+    const acts = el('div', 'pacts');
+    const e = el('button'); e.append(icon('edit')); e.title = 'Edit'; e.onclick = () => vaultSheet(p);
+    const d = el('button'); d.append(icon('trash')); d.title = 'Delete';
+    d.onclick = () => confirmSheet('Delete profile?', `“${p.name || p.host}” will be removed from this device. Session profiles already registered with the engine are not affected.`, 'Delete', () => {
+      vault = vault.filter(x => x.id !== p.id); saveVault(); if (ui.selected === p.id) { delete ui.selected; persist(); }
+      $('sheet').close(); renderVault(); toast('Profile deleted');
+    });
+    acts.append(e, d);
+    card.append(body, acts); list.append(card);
+  }
+  host.append(list);
+}
+
+/* ---------- import / export ---------- */
+function exportSheet() {
+  if (!vault.length) { toast('No profiles to export'); return; }
+  const root = dialog('Export profiles');
+  note(root, `${vault.length} profile${vault.length > 1 ? 's' : ''} will be written as JSON.`);
+  const l = el('label', 'switchrow');
+  const sl = el('span', 'sl'); sl.append(el('span', 'st', 'Include passwords'), el('span', 'ss', 'Off by default. An export containing passwords is plain text — store it somewhere safe.'));
+  const c = el('input'); c.type = 'checkbox'; c.className = 'switch';
+  l.append(sl, c); root.append(l);
+  applyButton(root, () => {
+    const data = { app: 'Scanner VPN', format: 'scanner-profiles', version: 1, exported: new Date().toISOString(), profiles: vault.map(p => { const o = Object.assign({}, p); if (!c.checked) delete o.secret; return o; }) };
+    const text = JSON.stringify(data, null, 2);
+    if (typeof Client.exportText === 'function') { Client.exportText('scanner-profiles.json', text); $('sheet').close(); }
+    else { Client.copyAccount(text); $('sheet').close(); toast('Copied to clipboard'); }
+  }, 'Export');
+}
+function receiveProfiles(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { toast('That file is not valid JSON', 'bad'); return; }
+  const incoming = Array.isArray(data) ? data : data?.profiles;
+  if (!Array.isArray(incoming)) { toast('No profiles found in that file', 'bad'); return; }
+  let added = 0, skipped = 0;
+  for (const raw of incoming.slice(0, 50)) {
+    const p = {
+      id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: String(raw.name || raw.host || '').slice(0, 64),
+      mode: String(raw.mode || 'SSH'), host: String(raw.host || '').trim().toLowerCase(), port: Number(raw.port) || 0,
+      user: String(raw.user || '').trim(), secret: String(raw.secret || ''),
+      path: String(raw.path || '/'), payload: String(raw.payload || ''), sni: String(raw.sni || '').trim().toLowerCase(),
+      udpGw: String(raw.udpGw || ''), dns: String(raw.dns || '1.1.1.1'), dns2: String(raw.dns2 || '')
+    };
+    if (!p.mode.startsWith('SSH')) { skipped++; continue; }
+    if (!p.secret) p.secret = '';
+    // A profile without a password is still useful; it is completed before connecting.
+    if (validate(Object.assign({}, p, { secret: p.secret || 'x' }))) { skipped++; continue; }
+    if (vault.some(x => x.host === p.host && x.port === p.port && x.user === p.user && x.mode === p.mode)) { skipped++; continue; }
+    vault.push(p); added++;
+  }
+  saveVault(); renderVault(); page('profiles');
+  toast(added ? `${added} profile${added > 1 ? 's' : ''} imported${skipped ? `, ${skipped} skipped` : ''}` : 'Nothing imported', added ? 'good' : 'bad');
+}
+$('vaultAdd').onclick = () => vaultSheet(null);
+$('vaultExport').onclick = exportSheet;
+$('vaultImport').onclick = () => { if (typeof Client.importProfiles === 'function') Client.importProfiles(); else toast('Import needs a newer app build', 'bad'); };
+$('accountSave').onclick = () => {
+  const d = currentDraft();
+  if (!d) { toast('Enter host:port@username:password first', 'bad'); return; }
+  vaultSheet(null, Object.assign({ name: d.host }, d));
+};
+
+/* ─────────────────────────── transport flags & quick tools ───────────────── */
+const labels = ['Use Payload', 'SSL', '', '', 'Custom DNS', 'UDPgw', '', 'V2ray'], boxes = [];
+labels.forEach((n, i) => {
+  const l = el('label'), box = el('input'); box.type = 'checkbox';
+  box.onchange = () => {
+    if (i === 0) ws = box.checked; if (i === 1) tls = box.checked; if (i === 4) custom = box.checked;
+    if (i === 5) udp = box.checked; if (i === 7) core = box.checked;
+    setHint(''); paint();
+  };
+  if (!n) l.hidden = true;
+  l.append(box, document.createTextNode(n)); $('flags').append(l); boxes.push(box);
+});
+for (const [label, id, ic, sub] of [
+  ['HTTP payload', 'payload', 'route', 'Upgrade request sent before SSH'],
+  ['SSL / SNI', 'sni', 'lock', 'TLS server name verification'],
+  ['DNS servers', 'dns', 'globe', 'Resolvers published to the tunnel'],
+  ['UDP gateway', 'udp', 'bolt', 'badvpn-udpgw forwarding']]) {
+  const b = el('button', 'row'); b.dataset.tool = id;
+  const ico = el('span', 'ic'); ico.append(icon(ic));
+  const lb = el('span', 'lbl'); lb.append(document.createTextNode(label), el('span', 'sub', sub));
+  b.append(ico, lb, el('span', 'val'), (() => { const c = el('span', 'caret'); c.append(icon('caret')); return c; })());
+  b.onclick = () => sectionEditor(id);
+  $('quicktools').append(b);
+}
+
+/* ─────────────────────────── settings view ───────────────────────────────── */
+function infoRow(root, label, sub, value, iconName, action) {
+  const node = action ? el('button', 'row') : el('div', 'row');
+  const ico = el('span', 'ic'); ico.append(icon(iconName)); node.append(ico);
+  const lb = el('span', 'lbl'); lb.append(document.createTextNode(label)); if (sub) lb.append(el('span', 'sub', sub));
+  node.append(lb);
+  if (value != null) node.append(el('span', 'val', value));
+  if (action) { node.onclick = action; const c = el('span', 'caret'); c.append(icon('caret')); node.append(c); }
+  root.append(node); return node;
+}
+function toggleRow(root, label, sub, checked, iconName, onchange, disabled) {
+  const node = el('label', 'row');
+  const ico = el('span', 'ic'); ico.append(icon(iconName)); node.append(ico);
+  const lb = el('span', 'lbl'); lb.append(document.createTextNode(label)); if (sub) lb.append(el('span', 'sub', sub));
+  const c = el('input'); c.type = 'checkbox'; c.className = 'switch'; c.checked = !!checked; c.disabled = !!disabled;
+  c.onchange = () => onchange(c.checked);
+  node.append(lb, c); root.append(node); return c;
+}
+function numberSheet(title, label, value, min, max, unit, fn) {
+  const root = dialog(title);
+  const input = field(root, label, value, 'number'); input.min = min; input.max = max;
+  const msg = note(root, `Allowed range: ${min}–${max} ${unit}.`);
+  applyButton(root, () => {
+    const v = Number(input.value);
+    if (!(v >= min && v <= max)) { msg.textContent = `Enter a value between ${min} and ${max}.`; msg.className = 'hintline bad'; return; }
+    fn(Math.round(v)); $('sheet').close(); renderSettings();
+  });
+}
+function renderSettings() {
+  const conn = $('setConnection'); conn.replaceChildren();
+  infoRow(conn, 'Connection timeout', 'Applies to SSH handshake and gateway dial', ui.timeout + ' s', 'clock',
+    () => numberSheet('Connection timeout', 'Seconds', ui.timeout, 5, 60, 'seconds', v => { ui.timeout = v; pushTimeout(); persist(); }));
+  toggleRow(conn, 'Auto-reconnect', 'Retry automatically after an unexpected drop', ui.autoReconnect, 'refresh', v => { ui.autoReconnect = v; persist(); renderSettings(); });
+  if (ui.autoReconnect)
+    infoRow(conn, 'Retry attempts', 'Backs off 3 s, 6 s, 12 s …', String(ui.retries), 'bolt',
+      () => numberSheet('Retry attempts', 'Attempts', ui.retries, 1, 10, 'attempts', v => { ui.retries = v; persist(); }));
+  infoRow(conn, 'Default DNS', 'Used when Custom DNS is off', '1.1.1.1', 'globe', () => sectionEditor('dns'));
+  infoRow(conn, 'Session profiles', `${s.profiles?.length || 0} registered`, null, 'layers', savedSheet);
+
+  const disp = $('setDisplay'); disp.replaceChildren();
+  toggleRow(disp, 'Block screenshots', 'FLAG_SECURE on the app window', prefs.privateScreen, 'lock', v => setPref('privateScreen', v));
+  toggleRow(disp, 'Keep screen awake', 'Hold the screen on while the app is open', prefs.keepAwake, 'sun', v => setPref('keepAwake', v));
+  toggleRow(disp, 'Follow event log', 'Auto-scroll the log to the newest line', prefs.followLogs, 'terminal', v => setPref('followLogs', v));
+  toggleRow(disp, 'Show transfer rates', 'Live upload and download figures', prefs.showRates, 'pulse', v => setPref('showRates', v));
+  toggleRow(disp, 'Connection notification', 'Android keeps a VPN notification while connected', true, 'bell', () => { renderSettings(); toast('Android requires the VPN notification'); }, true);
+
+  const diag = $('setDiag'); diag.replaceChildren();
+  infoRow(diag, 'Debug file', s.debugFile || '—', null, 'folder', null);
+  infoRow(diag, 'Choose Scanner folder', 'Where debug.txt is written', null, 'folder', () => Client.chooseFolder());
+  infoRow(diag, 'Stop file logging', 'Keeps the in-app session log', null, 'close', () => { Client.stopFile(); refresh(); toast('File logging stopped'); });
+  infoRow(diag, 'Test selected profile', 'Measures HTTPS through the active profile', null, 'flask', () => runCheck());
+  infoRow(diag, 'Reachability checks', 'Batch-verify saved endpoints', null, 'search', () => { page('log'); segment('checks'); });
+
+  const about = $('setAbout'); about.replaceChildren();
+  infoRow(about, 'Scanner VPN', 'Android client', 'v1.8', 'shield', null);
+  infoRow(about, 'Engine', 'Xray-core via AndroidLibXrayLite', null, 'bolt', null);
+  infoRow(about, 'SSH transport', 'JSch · pinned host keys, password auth', null, 'key', null);
+  infoRow(about, 'Profiles stored', `${vault.length} on this device`, null, 'layers', null);
+  infoRow(about, 'Reset saved profiles', 'Removes every profile from this device', null, 'trash',
+    () => confirmSheet('Remove all profiles?', 'Every profile stored on this device is deleted. Remembered SSH drafts and session profiles are not affected.', 'Delete all', () => {
+      vault = []; saveVault(); delete ui.selected; persist(); $('sheet').close(); renderVault(); renderSettings(); toast('All profiles removed');
+    }));
+}
+function setPref(key, value) { prefs[key] = value; Client.preference(key, value); paint(); }
+function pushTimeout() { opt('connectTimeout', null, ui.timeout * 1000); }
+
+/* ─────────────────────────── charts ──────────────────────────────────────── */
+const series = { down: [], up: [], max: 60 };
+let lastSampleAt = 0;
+function pushSample(d, u) {
+  const now = Date.now();
+  if (now - lastSampleAt < 900) return;
+  lastSampleAt = now;
+  series.down.push(Math.max(0, Number(d) || 0)); series.up.push(Math.max(0, Number(u) || 0));
+  while (series.down.length > series.max) { series.down.shift(); series.up.shift(); }
+  spark($('dlSpark'), series.down, '--jade'); spark($('ulSpark'), series.up, '--brand');
+  if (view === 'monitor') drawChart();
+}
+function resetSeries() { series.down.length = 0; series.up.length = 0; spark($('dlSpark'), series.down, '--jade'); spark($('ulSpark'), series.up, '--brand'); drawChart(); }
+function ctxFor(c) {
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth || c.width, h = c.clientHeight || c.height;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  const g = c.getContext && c.getContext('2d');
+  if (!g) return null;                       // canvas unavailable: charts degrade to the numeric stats
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h); return { g, w, h };
+}
+function colour(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#4D6BFF'; }
+function spark(canvas, data, token) {
+  if (!canvas) return;
+  const area = ctxFor(canvas); if (!area) return;
+  const { g, w, h } = area;
+  if (data.length < 2 || !prefs.showRates) return;
+  const peak = Math.max(1, ...data), n = series.max;
+  const x = i => w * (i / (n - 1)), y = v => h - 3 - (v / peak) * (h - 7);
+  const start = n - data.length;
+  g.beginPath(); g.moveTo(x(start), y(data[0]));
+  for (let i = 1; i < data.length; i++) g.lineTo(x(start + i), y(data[i]));
+  const c = colour(token);
+  g.lineTo(x(start + data.length - 1), h); g.lineTo(x(start), h); g.closePath();
+  g.fillStyle = c + '22'; g.fill();
+  g.beginPath(); g.moveTo(x(start), y(data[0]));
+  for (let i = 1; i < data.length; i++) g.lineTo(x(start + i), y(data[i]));
+  g.strokeStyle = c; g.lineWidth = 1.6; g.lineJoin = 'round'; g.stroke();
+}
+function drawChart() {
+  const canvas = $('bigChart'); if (!canvas) return;
+  const has = series.down.length > 1;
+  $('chartEmpty').hidden = has;
+  const area = ctxFor(canvas); if (!area) return;
+  const { g, w, h } = area;
+  const grid = colour('--hairline');
+  g.strokeStyle = grid; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const y = 4 + (h - 12) * i / 4; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  if (!has) return;
+  const peak = Math.max(1, ...series.down, ...series.up), n = series.max;
+  const x = i => w * (i / (n - 1)), y = v => (h - 8) - (v / peak) * (h - 16) + 4;
+  const draw = (data, token) => {
+    const start = n - data.length, c = colour(token);
+    g.beginPath(); g.moveTo(x(start), y(data[0]));
+    for (let i = 1; i < data.length; i++) g.lineTo(x(start + i), y(data[i]));
+    g.lineTo(x(start + data.length - 1), h); g.lineTo(x(start), h); g.closePath();
+    g.fillStyle = c + '1F'; g.fill();
+    g.beginPath(); g.moveTo(x(start), y(data[0]));
+    for (let i = 1; i < data.length; i++) g.lineTo(x(start + i), y(data[i]));
+    g.strokeStyle = c; g.lineWidth = 1.8; g.lineJoin = 'round'; g.stroke();
+  };
+  draw(series.down, '--jade'); draw(series.up, '--brand');
+  g.fillStyle = colour('--text-3'); g.font = '10px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
+  const p = rate(peak); g.fillText(`${p.v} ${p.u}`, 4, 12);
+}
+window.addEventListener('resize', () => { spark($('dlSpark'), series.down, '--jade'); spark($('ulSpark'), series.up, '--brand'); drawChart(); });
+
+/* ─────────────────────────── log rendering ───────────────────────────────── */
+let logFilter = '', logKind = 'all';
+$('logFilter').oninput = () => { logFilter = $('logFilter').value.trim().toLowerCase(); delete $('events').dataset.key; paint(); };
+for (const b of $('logLevels').children) b.onclick = () => { logKind = b.dataset.kind; for (const x of $('logLevels').children) x.classList.toggle('is-on', x === b); delete $('events').dataset.key; paint(); };
+
+function kindOf(tag) { return ['ERROR', 'FAILED'].includes(tag) ? 'bad' : ['ONLINE', 'VERIFIED'].includes(tag) ? 'ok' : ''; }
+
+/* Colour the endpoints in a log line. A host needs a real alphabetic last
+   label, so "HTTP/1.1", "curve25519-sha256" and "SSH-2.0-OpenSSH_9.6p1" stay
+   plain; a token glued to the previous one (chacha20-poly1305@openssh.com) is
+   part of an identifier, not an endpoint. */
+const TOKEN = /\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?|[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?::\d{1,5})?/ig;
+function highlight(text) {
+  const msg = el('span', 'msg');
+  let at = 0, m;
+  TOKEN.lastIndex = 0;
+  while ((m = TOKEN.exec(text))) {
+    if (m.index && /[@_.]/.test(text[m.index - 1])) continue;
+    if (m.index > at) msg.append(text.slice(at, m.index));
+    msg.append(el('span', /^\d/.test(m[0]) ? 'ip' : 'host', m[0]));
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) msg.append(text.slice(at));
+  return msg;
+}
+function render(id, rows, filtered) {
+  const host = $(id), key = JSON.stringify(rows) + '|' + (filtered ? logFilter + logKind : '');
+  if (host.dataset.key === key) return;
+  host.dataset.key = key;
+  host.replaceChildren();
+  let shown = 0;
+  for (const line of rows) {
+    const [time, tag, ...rest] = line.split('  '), text = rest.join('  ');
+    const kind = kindOf(tag);
+    if (filtered) {
+      if (logKind !== 'all' && kind !== logKind) continue;
+      if (logFilter && !line.toLowerCase().includes(logFilter)) continue;
+    }
+    shown++;
+    const row = el('div', 'event'); row.dataset.kind = kind;
+    row.append(el('time', null, time), el('b', null, tag));
+    row.append(highlight(text)); host.append(row);
+  }
+  if (!rows.length) host.append(el('div', 'empty', 'No events yet.'));
+  else if (!shown) host.append(el('div', 'empty', 'No entries match this filter.'));
+  if (prefs.followLogs) host.scrollTop = host.scrollHeight;
+}
+
+$('copyLog').onclick = () => Client.copySessionLog();
+$('exportLog').onclick = () => {
+  if (!s.log?.length) { toast('Nothing to export'); return; }
+  const text = s.log.join('\n');
+  if (typeof Client.exportText === 'function') Client.exportText('scanner-session-log.txt', text);
+  else { Client.copySessionLog(); toast('Copied to clipboard'); }
+};
+$('clearLog').onclick = () => confirmSheet('Clear session log?', 'Clears only the lines on this tab. Your connection, batch results and Scanner/debug.txt are kept.', 'Clear log',
+  () => { Client.clearSessionLog(); $('sheet').close(); refresh(); });
+
+/* ─────────────────────────── account line controls ───────────────────────── */
+function setHint(text, tone) {
+  $('hint').textContent = text;
+  const box = $('alert');
+  box.classList.toggle('hidden', !text);
+  if (tone) box.dataset.tone = tone; else delete box.dataset.tone;
+  box.querySelector('.ai use').setAttribute('href', tone === 'bad' ? '#i-warn' : tone === 'good' ? '#i-check' : '#i-info');
+}
+$('alertClose').onclick = () => setHint('');
+$('reveal').onclick = () => {
+  const node = $('account'); node.type = node.type === 'text' ? 'password' : 'text';
+  $('reveal').firstElementChild.firstElementChild.setAttribute('href', node.type === 'text' ? '#i-eyeoff' : '#i-eye');
+  $('reveal').setAttribute('aria-label', node.type === 'text' ? 'Hide account' : 'Show account');
+};
+$('copy').onclick = () => { if ($('account').value) { Client.copyAccount($('account').value); toast('Account copied'); } };
+$('paste').onclick = () => Client.pasteAccount();
+function receiveAccount(value) {
+  if (core || locked()) return;
+  const node = $('account');
+  node.value = value.replace(/[\r\n]+$/, '');
+  node.type = 'text';
+  $('reveal').firstElementChild.firstElementChild.setAttribute('href', '#i-eyeoff');
+  node.scrollLeft = 0;
+  setHint('Account pasted. Review it, then connect.', 'good');
+  paint();
+}
+$('remember').onchange = () => {
+  if (!$('remember').checked && !Client.forgetSsh()) { $('remember').checked = true; setHint('Could not forget this profile.', 'bad'); }
+  else setHint($('remember').checked ? 'This SSH profile will be saved locally when you tap Connect.' : 'SSH profile will not be kept after the app closes.');
+};
+$('edit').onclick = () => profileDialog();
+$('profilePill').onclick = () => { if (vault.length) page('profiles'); else savedSheet(); };
+
+/* ─────────────────────────── drawer ──────────────────────────────────────── */
+function menu() {
+  const l = $('links'); l.replaceChildren();
+  for (const [name, ic, action, inactive] of [
+    ['SSH configuration', 'key', () => profileDialog(), core],
+    ['HTTP payload', 'route', () => sectionEditor('payload'), core],
+    ['SSL / SNI', 'lock', () => sectionEditor('sni'), core],
+    ['UDP gateway', 'bolt', () => sectionEditor('udp'), core],
+    ['V2ray / core settings', 'globe', () => profileDialog(), !core],
+    ['Custom DNS', 'globe', () => sectionEditor('dns'), false],
+    ['Session profiles', 'layers', savedSheet, false]
+  ]) menuItem(l, name, ic, action, inactive || locked());
+  menuItem(l, 'Test selected profile', 'flask', runCheck, locked() || !active());
+  menuItem(l, 'Settings & debug file', 'sliders', () => { $('drawer').close(); page('settings'); });
+  $('drawer').showModal();
+}
+function runCheck() { $('drawer').close(); $('sheet').close(); Client.checks(false); page('log'); segment('checks'); refresh(); }
+$('menu').onclick = menu;
+$('closeMenu').onclick = () => $('drawer').close();
+$('dismiss').onclick = () => $('sheet').close();
+
+/* ─────────────────────────── batch checks ────────────────────────────────── */
+function receiveBatch(text) { if (!s.batch) { $('domains').value = text; paint(); } }
+const hosts = () => new Set((s.profiles || []).filter(p => p.startsWith(mode() + ' · ')).map(p => p.split(' · ')[1].split(':')[0]));
+$('savedHosts').onclick = () => receiveBatch([...hosts()].join('\n'));
+$('domains').oninput = () => paint();
+$('import').onclick = () => Client.importBatch();
+$('run').onclick = () => {
+  if (s.batch) Client.cancel();
+  else if (!Client.checkList($('domains').value, mode())) $('progress').textContent = 'Could not start. Configure a profile for each endpoint first.';
+  refresh();
+};
+
+/* ─────────────────────────── connect flow ────────────────────────────────── */
+let manualStop = false, retryCount = 0, retryTimer = 0;
+function go() {
+  if (['Starting', 'Connected'].includes(s.state)) { manualStop = true; clearTimeout(retryTimer); Client.disconnect(); return; }
+  if (locked()) return;
+  manualStop = false; retryCount = 0;
+  if (core) {
+    if (active() && s.activeDns === (custom ? dns : '1.1.1.1') && (s.activeDns2 || '') === (custom ? dns2 : '')) { Client.connect(); page('log'); }
+    else profileDialog(true);
+    return;
+  }
+  const raw = $('account').value;
+  if (raw) {
+    const m = parseAccount(raw);
+    if (!m) { setHint('Enter host:port@username:password.', 'bad'); page('profiles'); return; }
+    if (ws && payload === presetPayload && (m[1].toLowerCase() + ':' + Number(m[2])) !== presetEndpoint) {
+      setHint('This payload preset is for ' + presetEndpoint + '. Correct the account endpoint or edit Payload for your server.', 'bad'); return;
+    }
+    const draft = JSON.stringify({ mode: mode(), host: m[1], port: +m[2], user: m[3], secret: m[4], path: ws ? path : '/', payload: ws ? payload : '', sni: tls ? sni : '', udpGw: udp ? udpAddr : '', dns2: custom ? dns2 : '', dns: custom ? dns : '1.1.1.1' });
+    if ($('remember').checked && !Client.rememberSsh(draft)) {
+      setHint('Could not save this SSH profile. Check its settings, or turn off Remember to connect without saving.', 'bad'); return;
+    }
+    pending = true; after = true; paint(); page('log'); segment('session');
+    Client.enrollSsh(draft);
+  } else if (active() && (s.activePayload || '') === (ws ? payload : '') && (s.activeSni || '') === (tls ? sni : '') && (s.activeUdp || '') === (udp ? udpAddr : '') && s.activeDns === (custom ? dns : '1.1.1.1') && (s.activeDns2 || '') === (custom ? dns2 : '') && (!ws || path === s.activePath)) {
+    Client.connect(); page('log'); segment('session');
+  } else setHint('Paste an SSH account, including the server port.', 'bad');
+}
+function sshResult(message, ok) {
+  pending = false;
+  setHint(message, ok ? 'good' : 'bad');
+  if (ok && after) Client.connect();
+  after = false; refresh();
+}
+$('connect').onclick = go;
+$('stop').onclick = () => { manualStop = true; clearTimeout(retryTimer); Client.disconnect(); };
+$('qaReconnect').onclick = () => {
+  if (['Starting', 'Connected'].includes(s.state)) { manualStop = true; Client.disconnect(); setTimeout(() => { manualStop = false; go(); }, 1200); }
+  else go();
+};
+$('qaTest').onclick = runCheck;
+$('qaConfig').onclick = () => page('profiles');
+$('qaLogs').onclick = () => { page('log'); segment('session'); };
+
+/* ─────────────────────────── history ─────────────────────────────────────── */
+let live = { elapsed: 0, sent: 0, recv: 0, label: '', latency: -1 }, prevState = null;
+function record(ok, reason) {
+  const entry = { at: Date.now(), label: live.label || s.active || '—', secs: live.elapsed, sent: live.sent, recv: live.recv, latency: live.latency, ok: !!ok };
+  if (reason) entry.reason = reason;
+  ui.history.unshift(entry);
+  if (ui.history.length > 40) ui.history.length = 40;
+  persist(); renderHistory();
+}
+function renderHistory() {
+  const host = $('histList'); const key = JSON.stringify(ui.history.slice(0, 20));
+  if (host.dataset.key === key) return;
+  host.dataset.key = key; host.replaceChildren();
+  if (!ui.history.length) { host.append(el('div', 'empty', 'No sessions recorded yet.')); return; }
+  const card = el('div', 'card rows');
+  for (const h of ui.history.slice(0, 20)) {
+    const item = el('div', 'hitem');
+    const dot = el('span', 'hdot'); if (!h.ok) dot.classList.add('bad'); item.append(dot);
+    const body = el('div', 'hbody');
+    body.append(el('div', 'hn', h.label));
+    const d = bytes((h.recv || 0) + (h.sent || 0));
+    body.append(el('div', 'hm', `${stamp(h.at)} · ${h.ok ? dur(h.secs) : (h.reason || 'failed')}`));
+    item.append(body);
+    item.append(el('div', 'hval', h.ok ? `${d.v} ${d.u}` : '—'));
+    card.append(item);
+  }
+  host.append(card);
+}
+$('histClear').onclick = () => confirmSheet('Clear history?', 'Removes the local record of past sessions. Nothing else is affected.', 'Clear', () => {
+  ui.history = []; persist(); $('sheet').close(); renderHistory(); toast('History cleared');
+});
+
+/* ─────────────────────────── paint ───────────────────────────────────────── */
+const STATE_UI = { Idle: 'idle', Starting: 'pending', Connected: 'online', Stopping: 'closing', Failed: 'error' };
+const STATE_TEXT = { Idle: 'Disconnected', Starting: 'Connecting', Connected: 'Protected', Stopping: 'Disconnecting', Failed: 'Connection failed' };
+const DIAL_LABEL = { Idle: 'CONNECT', Starting: 'CANCEL', Connected: 'DISCONNECT', Stopping: 'STOPPING', Failed: 'RETRY' };
+const CIRC = 2 * Math.PI * 110;
+
+function paint() {
+  const lock = locked();
+  const state = s.state || 'Idle';
+  const uiState = pending ? 'pending' : (STATE_UI[state] || 'idle');
+
+  /* flags + tools ------------------------------------------------------- */
+  boxes.forEach((c, i) => {
+    c.checked = [!core && ws, !core && tls, false, false, custom, !core && udp, false, core][i];
+    c.disabled = lock || [2, 3, 6].includes(i) || (core && (i < 2 || i === 5));
+    c.parentElement.classList.toggle('locked', c.disabled);
+  });
+  $('accountBlock').hidden = core;
+  $('remember').disabled = $('paste').disabled = $('account').disabled = $('edit').disabled = $('accountSave').disabled = lock;
+  for (const b of $('quicktools').children) { b.hidden = core && b.dataset.tool !== 'dns'; b.disabled = lock; }
+  const tool = { payload: ws ? (wire === 'ws' ? 'WebSocket' : 'Raw SSH') : 'Off', sni: tls ? (sni || 'account host') : 'Off', dns: custom ? (dns2 ? dns + ' · ' + dns2 : dns) : '1.1.1.1', udp: udp ? udpAddr : 'Off' };
+  for (const b of $('quicktools').children) b.querySelector('.val').textContent = tool[b.dataset.tool] || '';
+  $('profile').textContent = mode();
+
+  /* dial ---------------------------------------------------------------- */
+  document.documentElement.dataset.state = uiState;
+  $('connect').dataset.state = uiState;
+  $('connect').disabled = s.batch || pending || state === 'Stopping';
+  $('dialLabel').textContent = pending ? 'CHECKING' : (DIAL_LABEL[state] || 'CONNECT');
+  $('dialIcon').setAttribute('href', state === 'Connected' ? '#i-shield' : state === 'Failed' ? '#i-warn' : '#i-power');
+  $('statusText').textContent = pending ? 'Verifying host key' : (STATE_TEXT[state] || 'Disconnected');
+
+  const arc = $('arc');
+  if (uiState === 'online') arc.style.strokeDasharray = `${CIRC} 0`;
+  else if (uiState === 'pending' || uiState === 'closing') arc.style.strokeDasharray = `${(CIRC * 0.24).toFixed(1)} ${CIRC}`;
+  else if (uiState === 'error') arc.style.strokeDasharray = `${CIRC} 0`;
+  else arc.style.strokeDasharray = `0 ${CIRC}`;
+
+  const elapsed = Number(s.elapsed) || 0;
+  if (state === 'Connected') { $('dialLabel').classList.add('timer'); $('dialLabel').textContent = dur(elapsed); $('dialSub').textContent = 'Tap to disconnect'; }
+  else { $('dialLabel').classList.remove('timer'); $('dialSub').textContent = pending ? 'Host key check' : state === 'Starting' ? 'Negotiating' : state === 'Failed' ? 'Tap to retry' : 'Tap to start'; }
+
+  /* profile pill -------------------------------------------------------- */
+  const sel = vault.find(p => p.id === ui.selected);
+  const acct = parseAccount($('account').value);
+  const name = sel?.name || (s.active ? s.active.split(' · ')[1] : null) || (acct ? acct[1] : null);
+  $('pillName').textContent = name || 'No profile selected';
+  $('pillAvatar').textContent = (name || '–').slice(0, 2).toUpperCase();
+  $('pillHost').textContent = sel ? `${sel.mode} · ${sel.user}@${sel.host}:${sel.port}` : s.active ? s.active : acct ? `${mode()} · ${acct[3]}@${acct[1]}:${acct[2]}` : 'Choose or create an SSH profile';
+
+  /* stats --------------------------------------------------------------- */
+  const showRates = prefs.showRates;
+  setStat($('dlRate'), showRates ? rate(s.down) : { v: '—', u: '' });
+  setStat($('ulRate'), showRates ? rate(s.up) : { v: '—', u: '' });
+  $('homeDuration').textContent = state === 'Connected' ? dur(elapsed) : '--:--';
+  setStat($('homeData'), bytes((Number(s.recv) || 0) + (Number(s.sent) || 0)));
+  $('rates').textContent = showRates ? `↓ ${(s.down || 0).toFixed(1)} · ↑ ${(s.up || 0).toFixed(1)} kB/s` : '';
+  $('rtt').textContent = s.latency >= 0 ? 'HTTPS ' + s.latency + ' ms' : '';
+  $('mLatency').textContent = s.latency >= 0 ? s.latency + ' ms' : '—';
+  $('mUptime').textContent = state === 'Connected' ? dur(elapsed) : '--:--';
+  setStat($('mRecv'), bytes(s.recv)); setStat($('mSent'), bytes(s.sent));
+  document.querySelector('.storage').textContent = s.debugFile || '';
+
+  /* connection info ----------------------------------------------------- */
+  const info = [
+    ['Status', STATE_TEXT[state] || state, 'shield'],
+    ['Transport', mode(), 'route'],
+    ['Endpoint', s.active ? s.active.split(' · ')[1] : acct ? `${acct[1]}:${acct[2]}` : '—', 'globe'],
+    ['TLS name', tls ? (sni || (acct ? acct[1] : 'account host')) : 'Not used', 'lock'],
+    ['DNS', custom ? (dns2 ? `${dns}, ${dns2}` : dns) : '1.1.1.1', 'globe'],
+    ['UDP gateway', udp ? udpAddr : 'Off', 'bolt'],
+    ['Latency', s.latency >= 0 ? s.latency + ' ms' : '—', 'pulse']
+  ];
+  const infoKey = JSON.stringify(info);
+  if ($('connInfo').dataset.key !== infoKey) {
+    $('connInfo').dataset.key = infoKey; $('connInfo').replaceChildren();
+    for (const [k, v, ic] of info) infoRow($('connInfo'), k, null, v, ic, null);
+  }
+  const sess = [
+    ['Session profile', s.active || '—'],
+    ['Started', state === 'Connected' ? new Date(Date.now() - elapsed * 1000).toLocaleTimeString() : '—'],
+    ['Duration', state === 'Connected' ? dur(elapsed) : '—'],
+    ['Downloaded', (b => `${b.v} ${b.u}`)(bytes(s.recv))],
+    ['Uploaded', (b => `${b.v} ${b.u}`)(bytes(s.sent))],
+    ['Debug file', s.debugFile || '—']
+  ];
+  const sessKey = JSON.stringify(sess);
+  if ($('sessionInfo').dataset.key !== sessKey) {
+    $('sessionInfo').dataset.key = sessKey; $('sessionInfo').replaceChildren();
+    for (const [k, v] of sess) { const r = el('div', 'row'); r.append(el('span', 'lbl', k), el('span', 'val mono', v)); $('sessionInfo').append(r); }
+  }
+
+  /* logs + batch -------------------------------------------------------- */
+  $('clearLog').disabled = $('copyLog').disabled = $('exportLog').disabled = !s.log?.length;
+  $('stop').hidden = !['Starting', 'Connected'].includes(state);
+  $('status').textContent = pending ? 'Checking SSH host identity…' : state === 'Connected' && s.active ? s.active : '';
+
+  const targets = [...new Set($('domains').value.trim().toLowerCase().split(/[\s,;]+/).filter(Boolean))];
+  const missing = targets.find(h => !hosts().has(h));
+  $('count').textContent = missing ? 'No saved profile for ' + missing : `${targets.length} domains · checks use saved endpoint credentials`;
+  $('run').disabled = !s.batch && (lock || !targets.length || targets.length > 100 || !!missing);
+  $('run').textContent = s.batch ? 'STOP BATCH' : 'CONNECT BATCH';
+  $('domains').disabled = $('import').disabled = $('savedHosts').disabled = s.batch;
+  $('progress').textContent = s.total ? `${s.completed} / ${s.total} checks finished` : '';
+  render('events', s.log || [], true);
+  render('checks', s.checks || [], false);
+
+  /* quick actions ------------------------------------------------------- */
+  $('qaReconnect').disabled = pending || s.batch || (!s.active && !parseAccount($('account').value));
+  $('qaTest').disabled = locked() || !active();
+}
+
+/* ─────────────────────────── lifecycle ───────────────────────────────────── */
+function transition(next) {
+  if (prevState === next) return;
+  const was = prevState; prevState = next;
+  if (was === null) return;
+  if (next === 'Connected') { resetSeries(); toast('Connected', 'good'); setHint(''); retryCount = 0; }
+  if (was === 'Connected' && next !== 'Connected') {
+    record(true);
+    if (next === 'Failed') toast('Connection dropped', 'bad'); else toast('Disconnected');
+  }
+  if (was === 'Starting' && next === 'Failed') record(false, 'handshake failed');
+  if (next === 'Failed') {
+    const last = (s.log || []).filter(l => l.split('  ')[1] === 'ERROR').pop();
+    if (last) setHint(last.split('  ').slice(2).join('  '), 'bad');
+    maybeRetry();
+  }
+  if (next === 'Idle') resetSeries();
+}
+function maybeRetry() {
+  if (!ui.autoReconnect || manualStop || !s.active || retryCount >= ui.retries) return;
+  retryCount++;
+  const wait = Math.min(3000 * Math.pow(2, retryCount - 1), 30000);
+  toast(`Reconnecting in ${Math.round(wait / 1000)} s (${retryCount}/${ui.retries})`, 'warn');
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if (manualStop || !['Idle', 'Failed'].includes(s.state)) return;
+    Client.connect();
+  }, wait);
+}
+function refresh() {
+  s = JSON.parse(Client.snapshot());
+  if (s.state === 'Connected') live = { elapsed: Number(s.elapsed) || 0, sent: Number(s.sent) || 0, recv: Number(s.recv) || 0, label: s.active || '', latency: s.latency };
+  transition(s.state);
+  if (s.state === 'Connected' && prefs.showRates) pushSample(s.down, s.up);
+  paint();
+}
+
+/* ---------- boot ---------- */
+function providerPreset() {
+  ws = tls = true; wire = 'ws'; sni = ''; payload = presetPayload;
+  $('account').value = presetEndpoint + '@';
+  setHint('WSS preset ready. Paste your account or type the login after @.');
+}
+function restoreDraft(p) {
+  useMode(p.mode); sni = p.sni || ''; path = p.path || '/'; payload = p.payload || '';
+  dns = p.dns; dns2 = p.dns2 || ''; custom = dns !== '1.1.1.1' || !!dns2;
+  udp = !!p.udpGw; udpAddr = p.udpGw || '127.0.0.1:7300';
+  $('account').value = `${p.host}:${p.port}@${p.user}:${p.secret}`;
+  $('remember').checked = true;
+  setHint('Remembered SSH profile ready.');
+}
+
+applyTheme();
+pushTimeout();
+segment('session');
+s = JSON.parse(Client.snapshot());
+const local = Client.rememberedSsh();
+if (s.active) {
+  useSaved();
+  $('remember').checked = !!local && !core && (() => { try { const p = JSON.parse(local); return s.active === `${p.mode} · ${p.host}:${p.port}`; } catch (e) { return false; } })();
+} else if (local) restoreDraft(JSON.parse(local));
+else providerPreset();
+
+prevState = s.state;
+renderVault(); renderHistory(); renderSettings();
+paint();
+setInterval(refresh, 450);
+
+</script>
+</body>
+</html>
