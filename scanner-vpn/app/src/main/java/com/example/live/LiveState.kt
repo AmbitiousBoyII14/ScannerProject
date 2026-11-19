@@ -24,6 +24,7 @@ internal object LiveState {
     private var total=0;private var completed=0
     private val executor=Executors.newSingleThreadExecutor()
     @Synchronized fun save(p:Profile){require(editable() && (profiles.size<12||profiles.containsKey(p.label)));profiles[p.label]=p;chosen=p.label}
+    @Synchronized fun clearProfiles(){if(editable()){profiles.clear();chosen=""}}
     @Synchronized fun select(key:String){if(editable() && profiles.containsKey(key))chosen=key}
     @Synchronized fun active()=profiles[chosen]
     fun editable()=status in setOf("Idle","Failed")&&!batchRunning

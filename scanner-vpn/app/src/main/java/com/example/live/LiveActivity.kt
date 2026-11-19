@@ -11,8 +11,8 @@ import android.widget.Toast
 
 class LiveActivity:Activity(){
     private lateinit var web:WebView
-    override fun onCreate(saved:Bundle?){super.onCreate(saved);applySettings();web=WebView(this);web.settings.apply{javaScriptEnabled=true;allowFileAccess=false;allowContentAccess=false;blockNetworkLoads=true;domStorageEnabled=false};web.webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView?,request:WebResourceRequest?)=true;override fun shouldInterceptRequest(view:WebView?,request:WebResourceRequest):WebResourceResponse{val path=request.url.path;return if(request.url.host=="app.invalid"&&path in listOf("/index.html","/style.css","/ui.js","/core-editor.js")){val mime=when(path){"/index.html"->"text/html";"/ui.js"->"text/javascript";else->"text/css"};WebResourceResponse(mime,"utf-8",assets.open("live$path"))}else WebResourceResponse("text/plain","utf-8",null)}};web.addJavascriptInterface(Bridge(),"Client");val frame=android.widget.FrameLayout(this);frame.setBackgroundColor(android.graphics.Color.WHITE);frame.addView(web);setContentView(frame);window.decorView.systemUiVisibility=window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        frame.setOnApplyWindowInsetsListener{v,i->if(Build.VERSION.SDK_INT>=30){val b=i.getInsets(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout() or android.view.WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,b.bottom)}else v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom);i};frame.requestApplyInsets();web.loadUrl("https://app.invalid/index.html");if(!DebugFile.init(this)&&saved==null)web.post{askForFolder()}}
+    override fun onCreate(saved:Bundle?){super.onCreate(saved);applySettings();web=WebView(this);web.settings.apply{javaScriptEnabled=true;allowFileAccess=false;allowContentAccess=false;blockNetworkLoads=true;domStorageEnabled=false};web.webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView?,request:WebResourceRequest?)=true;override fun shouldInterceptRequest(view:WebView?,request:WebResourceRequest):WebResourceResponse{val path=request.url.path;return if(request.url.host=="app.invalid"&&path in listOf("/index.html","/style.css","/ui.js","/core-editor.js")){val mime=when(path){"/index.html"->"text/html";"/ui.js","/core-editor.js"->"text/javascript";else->"text/css"};WebResourceResponse(mime,"utf-8",assets.open("live$path"))}else WebResourceResponse("text/plain","utf-8",null)}};web.addJavascriptInterface(Bridge(),"Client");val frame=android.widget.FrameLayout(this);frame.setBackgroundColor(0xff17181c.toInt());web.setBackgroundColor(0xff17181c.toInt());window.statusBarColor=0xff17181c.toInt();frame.addView(web);setContentView(frame);window.decorView.systemUiVisibility=window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+        frame.setOnApplyWindowInsetsListener{v,i->if(Build.VERSION.SDK_INT>=30){val b=i.getInsets(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout() or android.view.WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,b.bottom)}else v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom);i};frame.requestApplyInsets();web.loadUrl("https://app.invalid/index.html");DebugFile.init(this)}
     private fun askForFolder(){
         android.app.AlertDialog.Builder(this).setTitle("Save Scanner/debug.txt?").setMessage("Choose or create Scanner in internal storage, or select Documents and Scanner will be created inside it. Debug logs include server addresses and connection results, never account passwords. Android requires your approval once.")
           .setPositiveButton("Choose folder"){_,_->try{startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION),44)}catch(e:Exception){Toast.makeText(this,"No folder picker available",Toast.LENGTH_LONG).show()}}
@@ -26,7 +26,7 @@ class LiveActivity:Activity(){
     }
     private val prefKeys=listOf("privateScreen","keepAwake","followLogs","showRates")
     private fun defaultValue(key:String)=key=="followLogs"||key=="showRates"
-    private fun importDocument(uri:android.net.Uri){
+    private fun importDocument(uri:android.net.Uri,config:Boolean=false){
         Thread {
             try {
                 val text=contentResolver.openInputStream(uri)!!.use { stream ->
@@ -34,7 +34,7 @@ class LiveActivity:Activity(){
                     while(true){val n=stream.read(buf);if(n<0)break;require(out.size()+n<=65536);out.write(buf,0,n)}
                     out.toString("UTF-8").removePrefix("\uFEFF")
                 }
-                runOnUiThread{if(!isDestroyed)web.evaluateJavascript("receiveBatch("+org.json.JSONObject.quote(text)+")",null)}
+                runOnUiThread{if(!isDestroyed)web.evaluateJavascript((if(config)"receiveConfig(" else "receiveBatch(")+org.json.JSONObject.quote(text)+")",null)}
             } catch(e:Exception){runOnUiThread{Toast.makeText(this,"Could not import. Use a UTF-8 text file under 64 KiB.",Toast.LENGTH_LONG).show()}}
         }.start()
     }
@@ -55,6 +55,9 @@ class LiveActivity:Activity(){
         val message=if(ok)"SSH profile selected." else "Could not select SSH profile. Check the account fields."
         LiveState.log("PROFILE",message);web.evaluateJavascript("sshResult("+org.json.JSONObject.quote(message)+",$ok)",null)
     }
+    private fun toast(msg:String){Toast.makeText(this,msg,Toast.LENGTH_LONG).show()}
+    private var pendingExport:String?=null
+    @Deprecated("Classic activity back navigation") override fun onBackPressed(){web.evaluateJavascript("typeof nativeBack==='function' && nativeBack()"){if(it!="true")moveTaskToBack(true)}}
     private val remembered by lazy { RememberedSsh(applicationContext) }
     inner class Bridge{
         @JavascriptInterface fun forgetHostKey(host:String,port:Int){runOnUiThread{
@@ -108,12 +111,20 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun setConnectionPolicy(seconds:Int,auto:Boolean,retries:Int)=runCatching{CheckPolicy(seconds,auto,retries).save(this@LiveActivity)}.getOrDefault(false)
         @JavascriptInterface fun preferences()=org.json.JSONObject().apply {prefKeys.forEach{put(it,prefs.getBoolean(it,defaultValue(it)))}}.toString()
         @JavascriptInterface fun preference(key:String,value:Boolean){if(key in prefKeys){prefs.edit().putBoolean(key,value).apply();runOnUiThread{applySettings()}}}
+        @JavascriptInterface fun clearProfiles(){LiveState.clearProfiles()}
+        @JavascriptInterface fun leaveApp(){runOnUiThread{if(LiveState.editable())finish()}}
+        @JavascriptInterface fun validConfig(raw:String)=runCatching{Profile.read(raw,forDiscovery=true);true}.getOrDefault(false)
+        @JavascriptInterface fun importConfig(){runOnUiThread{try{startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*"),47)}catch(_:Exception){toast("No document picker available")}}}
+        @JavascriptInterface fun writeDocument(kind:String,text:String){if(kind !in listOf("log","profile") || text.length>262144)return;runOnUiThread{
+            val suffix=if(kind=="log")"txt" else "json";pendingExport=text
+            try{startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(if(kind=="log")"text/plain" else "application/json").putExtra(Intent.EXTRA_TITLE,"Scanner-$kind.$suffix"),48)}catch(_:Exception){pendingExport=null;toast("No document picker available")}
+        }}
         @JavascriptInterface fun importBatch(){runOnUiThread{try{startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("text/*"),43)}catch(e:android.content.ActivityNotFoundException){Toast.makeText(this@LiveActivity,"No document picker installed",Toast.LENGTH_SHORT).show()}}}
         @JavascriptInterface fun cancel()=LiveState.cancel()
         @JavascriptInterface fun connect(){runOnUiThread{if(!LiveState.editable()||LiveState.active()==null)return@runOnUiThread;try{val consent=VpnService.prepare(this@LiveActivity);if(consent!=null)startActivityForResult(consent,42) else startTunnel()}catch(e:Exception){LiveState.log("ERROR","Android could not request VPN access")}}}
         @JavascriptInterface fun disconnect(){runOnUiThread{if(LiveState.status in listOf("Starting","Connected"))startService(Intent(this@LiveActivity,TunnelService::class.java).setAction("stop"))}}
     }
     private fun startTunnel(){if(!LiveState.editable()||LiveState.active()==null)return;LiveState.status="Starting";LiveState.log("START",LiveState.active()!!.label);try{val i=Intent(this,TunnelService::class.java).setAction("connect");if(Build.VERSION.SDK_INT>=26)startForegroundService(i) else startService(i)}catch(e:Exception){LiveState.status="Failed";LiveState.log("ERROR","Android blocked VPN startup")}}
-    override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==45){val ok=android.provider.Settings.canDrawOverlays(this);setShortcut(ok);if(!ok)Toast.makeText(this,"Floating icon is off. Background VPN does not need this permission.",Toast.LENGTH_LONG).show()};if(request==44&&result==RESULT_OK)data?.data?.let{uri->try{require(uri.authority=="com.android.externalstorage.documents");contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);DebugFile.configure(uri)}catch(e:Exception){Toast.makeText(this,"Choose a folder on local device storage.",Toast.LENGTH_LONG).show()}};if(request==43 && result==RESULT_OK)data?.data?.let(::importDocument);if(request==42){if(result==RESULT_OK)startTunnel() else LiveState.log("STOP","VPN permission not granted")}}
+    override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==47&&result==RESULT_OK)data?.data?.let{importDocument(it,true)};if(request==48){val text=pendingExport;pendingExport=null;val uri=data?.data;if(result==RESULT_OK&&uri!=null&&text!=null)Thread{val ok=runCatching{requireNotNull(contentResolver.openOutputStream(uri,"wt")).bufferedWriter().use{it.write(text)}}.isSuccess;runOnUiThread{toast(if(ok)"File saved" else "Could not write file")}}.start()};if(request==45){val ok=android.provider.Settings.canDrawOverlays(this);setShortcut(ok);if(!ok)Toast.makeText(this,"Floating icon is off. Background VPN does not need this permission.",Toast.LENGTH_LONG).show()};if(request==44&&result==RESULT_OK)data?.data?.let{uri->try{require(uri.authority=="com.android.externalstorage.documents");contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);DebugFile.configure(uri)}catch(e:Exception){Toast.makeText(this,"Choose a folder on local device storage.",Toast.LENGTH_LONG).show()}};if(request==43 && result==RESULT_OK)data?.data?.let(::importDocument);if(request==42){if(result==RESULT_OK)startTunnel() else LiveState.log("STOP","VPN permission not granted")}}
     override fun onDestroy(){web.removeJavascriptInterface("Client");web.destroy();super.onDestroy()}
 }

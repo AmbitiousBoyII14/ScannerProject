@@ -33,30 +33,33 @@ class AccountFlowTest {
             // Real clipboard → import review → native Xray JSON. Never connect to the example host.
             val link="vless://00000000-0000-4000-8000-000000000001@192.0.2.9:443/?type=ws&host=route.example&security=tls&sni=cert.example&path=%2Ffixture&allowInsecure=1#demo"
             inst.runOnMainSync{ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("share fixture",link))}
-            js("document.querySelectorAll('#flags input')[7].click();document.querySelector('#edit').click();document.querySelector('#body .tools button').click();document.querySelector('#body .dismiss').click()")
+            assertEquals("8",js("document.querySelectorAll('#flags input').length"))
+            js("document.querySelector('#plugins').click();[...document.querySelectorAll('#popup button')].find(b=>b.textContent==='V2ray Settings').click();[...document.querySelectorAll('#detailTools button')].find(b=>b.textContent==='Paste').click();document.querySelector('.pasteLink').click()")
             until("document.getElementById('coreShare')?.value.endsWith('#demo')===true")
-            js("document.querySelector('#body .apply').click()");until("document.querySelector('#body label').hidden===false")
-            js("document.querySelector('#body input').click();document.querySelector('#body .apply').click();document.querySelectorAll('#body .tools button')[1].click()")
-            until("document.querySelector('#body pre')!==null")
-            val config=org.json.JSONObject(org.json.JSONTokener(js("document.querySelector('#body pre').textContent")).nextValue() as String)
+            js("document.querySelector('#apply').click()");until("document.querySelector('#error').textContent.includes('verified TLS')")
+            js("document.querySelector('#fields input[type=checkbox]').click();document.querySelector('#apply').click();document.querySelector('#detailTools button').click()")
+            until("document.querySelector('#content pre')!==null")
+            val config=org.json.JSONObject(org.json.JSONTokener(js("document.querySelector('#content pre').textContent")).nextValue() as String)
             val outbound=config.getJSONArray("outbounds").getJSONObject(0);val stream=outbound.getJSONObject("streamSettings")
             assertEquals("192.0.2.9",outbound.getJSONObject("settings").getJSONArray("vnext").getJSONObject(0).getString("address"));assertEquals("/fixture",stream.getJSONObject("wsSettings").getString("path"));assertEquals("route.example",stream.getJSONObject("wsSettings").getString("host"));assertEquals("cert.example",stream.getJSONObject("tlsSettings").getString("serverName"))
-            js("document.querySelector('#dismiss').click();document.querySelectorAll('#flags input')[7].click()")
+            js("document.querySelector('#back').click();document.querySelector('#burger').click();[...document.querySelectorAll('#drawer button')].find(b=>b.textContent==='SSH Settings').click()")
             val account="127.0.0.1:${server.localPort}@fixture:a@:https://example.test/password"
             inst.runOnMainSync{ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("fixture",account))}
-            js("document.getElementById('paste').click()");until("document.getElementById('account').value.endsWith('example.test/password')");assertEquals("\"text\"",js("document.getElementById('account').type"))
-            js("document.querySelector('[data-tool=payload]').click()");js("document.querySelector('#body select').value='ws';document.querySelector('#body textarea').value='GET /fixture HTTP/1.1[crlf]Host: [host][crlf]Connection: Upgrade[crlf]Upgrade: websocket';document.querySelector('#body .apply').click()")
-            until("!document.getElementById('sheet').open")
-            js("document.querySelector('[data-tool=sni]').click();document.querySelector('#body input').value='localhost';document.querySelector('#body .apply').click()");until("document.getElementById('profile').textContent==='SSH WS TLS'")
-            js("document.querySelectorAll('#flags input')[2].click()");until("document.getElementById('profile').textContent==='SSH WS+Raw TLS'")
-            // Local 403 fixture is deliberately plain HTTP.
-            js("document.querySelectorAll('#flags input')[1].click();document.querySelector('[data-tool=dns]').click();document.querySelectorAll('#body input')[1].value='9.9.9.9';document.querySelector('#body .apply').click()");js("document.querySelector('[data-tool=udp]').click();document.querySelector('#body .apply').click();document.getElementById('remember').click();document.getElementById('connect').click()")
+            js("[...document.querySelectorAll('#content button')].find(b=>b.textContent==='Paste').click()");until("document.getElementById('sshLine').value.endsWith('example.test/password')")
+            js("document.getElementById('remember').click();document.querySelector('#content .apply').click()")
+            fun drawer(name:String){js("document.querySelector('#burger').click();[...document.querySelectorAll('#drawer button')].find(b=>b.textContent==='$name').click()")}
+            drawer("Payload");js("document.querySelector('#fields select').value='WebSocket or raw SSH';document.querySelector('#fields textarea').value='GET /fixture HTTP/1.1[crlf]Host: [host][crlf]Connection: Upgrade[crlf]Upgrade: websocket';document.querySelector('#apply').click()")
+            drawer("SNI");js("document.querySelector('#fields input').value='localhost';document.querySelector('#apply').click()")
+            // Local 403 fixture uses HTTP without TLS; changing SSL preserves payload framing.
+            js("[...document.querySelectorAll('#flags input')].find(i=>i.value==='SSL').click()")
+            drawer("DNS Custom");js("document.querySelectorAll('#fields input')[1].value='9.9.9.9';document.querySelector('#apply').click()")
+            drawer("UDPGW SSH");js("document.querySelector('#apply').click();document.querySelector('#connect').click()")
             assertEquals("GET /fixture HTTP/1.1",received.poll(15,TimeUnit.SECONDS));until("document.getElementById('events').textContent.includes('HTTP 403')");assertEquals("false",js("document.getElementById('events').textContent.includes('example.test/password')"))
-            js("document.getElementById('copyLog').click()")
+            js("document.getElementById('copy').click()")
             var copied="";for(n in 0..30){inst.runOnMainSync{copied=ctx.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text.toString()};if("HTTP 403" in copied)break;Thread.sleep(100)}
             assertTrue(copied.contains("HTTP 403"));assertFalse(copied.contains("example.test/password"))
-            js("document.getElementById('clearLog').click();document.querySelector('#body .apply').click()");until("document.getElementById('copyLog').disabled && !document.getElementById('events').textContent.includes('HTTP 403')")
-            js("location.reload()");until("typeof receiveAccount==='function' && document.getElementById('remember').checked && document.getElementById('account').value.endsWith('example.test/password')");js("document.getElementById('remember').click()");until("Client.rememberedSsh()==='' ")
+            js("document.querySelector('#plugins').click();document.querySelector('#apply').click()");until("!document.getElementById('events').textContent.includes('HTTP 403')")
+            js("location.reload()");until("typeof receiveAccount==='function' && document.getElementById('account').value.endsWith('example.test/password')");drawer("SSH Settings");until("document.getElementById('remember').checked");js("document.getElementById('remember').click()");until("Client.rememberedSsh()==='' ")
 
 
         }}finally{inst.runOnMainSync{a.finish()}}

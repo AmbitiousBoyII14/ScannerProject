@@ -4,6 +4,10 @@
 
 This directory (`scanner-vpn/`) is the Gradle project to open. The repository-root `app/` is a different application; `web-preview/` is a simulation. The Android app here uses a bundled WebView for controls and a native `VpnService` for traffic. Package: `com.scannervpn.android`; minimum Android 7.0 (API 24).
 
+## 1.15 · Custom layout (Android)
+
+The dark SSH / Log / Batch interface reuses the approved standalone preview's markup and stylesheet. Its data comes from the Android service, not the browser simulator. Choose **puzzle → V2ray Settings** to import a share link, **drawer → SSH Settings** to enter an SSH account, and **Payload → After upgrade** for raw SSH compatibility. VPN Settings retains the background shortcut, display and debug-file controls. Batch uses each matching saved profile's own credentials, or a credential-free TLS check on other targets. Local configs and logs can be opened/saved using the Android document picker. Config files include secrets: keep them private. Enhanced, SlowDns, Psiphon and utilities without an installed backend remain visibly listed but cannot enable a fake tunnel. Insecure TLS is not supported by the bundled Xray version.
+
 ## 1.14 · Background VPN & optional shortcut
 
 After **Connected**, press Home, switch apps, or use **Settings & debug file → Continue in background**. The user-started VPN foreground service owns the tunnel, independent of the activity. Enable its ongoing notification from the same settings to return or disconnect. **Floating VPN icon over other apps** is off by default and requests Android's display-over-other-apps permission only on opt-in. It appears only outside the app during a verified connection. Tap to return or drag to reposition. Disconnect, failure or revocation of the VPN removes it. Denying overlay permission does not stop the VPN. This is not a boot launcher or a way to survive force-stop, OS termination, loss of network or OEM power restrictions.
