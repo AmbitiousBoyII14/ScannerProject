@@ -44,10 +44,10 @@ jobs:
         run: |
           built=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APPROVED_RUN" --jq '.head_sha')
           git diff --exit-code "$built" HEAD -- scanner-vpn ':!scanner-vpn/signing/approval.json'
-          tools/package-vpn-1.15-source.sh
+          tools/package-vpn-1.16-source.sh
       - name: Publish verified APKs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git archive --format=zip --output=Scanner-VPN-source.zip HEAD scanner-vpn .github/workflows/scanner-vpn-preview.yml .github/workflows/scanner-vpn-sign.yml
-          gh release create "scanner-vpn-signed-${GITHUB_RUN_ID}" apks/*.apk Scanner-VPN-source.zip Scanner-VPN-1.15-Android-project.zip Scanner-VPN-Demo.html --target "$GITHUB_SHA" --title 'Scanner VPN 1.15 · signed Android client' --prerelease --notes 'APK v2 signature verified against the Scanner VPN update certificate. Use the same CPU variant for updates.'
+          gh release create "scanner-vpn-signed-${GITHUB_RUN_ID}" apks/*.apk Scanner-VPN-source.zip Scanner-VPN-1.16-Android-project.zip Scanner-VPN-Demo.html --target "$GITHUB_SHA" --title 'Scanner VPN 1.16 · signed Android client' --prerelease --notes 'APK v2 signature verified against the Scanner VPN update certificate. Use the same CPU variant for updates.'
