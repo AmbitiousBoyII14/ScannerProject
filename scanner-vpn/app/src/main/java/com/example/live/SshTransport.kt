@@ -27,8 +27,9 @@ internal class SshTransport private constructor(private val session:Session):Clo
     companion object {
         // A fresh JSch instance, empty trust repository and strict checking: abort at
         // key exchange, before user authentication. Only that specific rejection is expected.
-        fun discover(host:String,port:Int):Pair<String,String> {
+        fun discover(host:String,port:Int,gateway:SshGateway?=null):Pair<String,String> {
             val jsch=JSch();val probe=jsch.getSession("host-key-check",host,port)
+            if(gateway!=null)probe.setProxy(gateway)
             probe.setConfig("StrictHostKeyChecking","yes");probe.setConfig("PreferredAuthentications","none")
             try { probe.connect(10000);error("Unexpected trusted key on discovery") }
             catch(e:com.jcraft.jsch.JSchUnknownHostKeyException){
@@ -36,11 +37,12 @@ internal class SshTransport private constructor(private val session:Session):Clo
                 return "${key.type} ${key.key}" to key.getFingerPrint(jsch)
             } finally {probe.disconnect()}
         }
-        fun open(ip:String,port:Int,user:String,password:String,hostKey:String):SshTransport {
+        fun open(ip:String,port:Int,user:String,password:String,hostKey:String,gateway:SshGateway?=null):SshTransport {
             val ssh=JSch();val alias="scanner-profile"
             val fields=hostKey.trim().split(Regex("\\s+"));require(fields.size>=2)
             ssh.setKnownHosts("$alias ${fields[0]} ${fields[1]}\n".byteInputStream())
             val session=ssh.getSession(user,ip,port)
+            if(gateway!=null)session.setProxy(gateway)
             session.setHostKeyAlias(alias)
             session.setConfig("server_host_key",if(fields[0]=="ssh-rsa")"rsa-sha2-512,rsa-sha2-256" else fields[0])
             session.setConfig("StrictHostKeyChecking","yes")

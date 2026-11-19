@@ -10,6 +10,21 @@ import kotlin.concurrent.thread
 
 class SshTransportTest {
     private fun profile(key:String,password:String):Profile=Profile.read(obj("mode" to "SSH","host" to "127.0.0.1","port" to 22257,"user" to System.getenv("SSH_TEST_USER"),"secret" to password,"hostKey" to key).toString())
+    @Test fun gatewayDiscoveryAndAuthentication(){
+        val cert=System.getenv("GATEWAY_TEST_CERT");assumeNotNull(cert)
+        val old=javax.net.ssl.SSLContext.getDefault()
+        try{
+            val ks=java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType());ks.load(null,null)
+            java.io.File(cert).inputStream().use{ks.setCertificateEntry("fixture",java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(it))}
+            val tm=javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());tm.init(ks)
+            javax.net.ssl.SSLContext.setDefault(javax.net.ssl.SSLContext.getInstance("TLS").apply{init(null,tm.trustManagers,null)})
+            for((mode,port) in listOf("SSH WS" to 22258,"SSH WS TLS" to 22259,"SSH TLS" to 22260)){
+                val p=Profile.read(obj("mode" to mode,"host" to "localhost","port" to port,"user" to System.getenv("SSH_TEST_USER"),"secret" to System.getenv("SSH_TEST_PASSWORD"),"hostKey" to System.getenv("SSH_TEST_KEY")).toString())
+                val key=SshTransport.discover(p.host,p.port,p.gateway{_,_->});assertEquals(System.getenv("SSH_TEST_KEY").split(" ").take(2).joinToString(" "),key.first)
+                p.openSsh("127.0.0.1")!!.use{assertTrue(it.port>0)}
+            }
+        }finally{javax.net.ssl.SSLContext.setDefault(old)}
+    }
     @Test fun realSshForwardingWithLiteralUrlPassword(){
         val key=System.getenv("SSH_TEST_KEY");assumeNotNull(key)
         val discovered=SshTransport.discover("127.0.0.1",22257);assertEquals(key.split(" ").take(2).joinToString(" "),discovered.first);assertTrue(discovered.second.isNotBlank())

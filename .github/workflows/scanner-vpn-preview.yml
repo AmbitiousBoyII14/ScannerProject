@@ -2,7 +2,7 @@ name: Scanner VPN preview APK
 on:
   push:
     branches: ['arena/5c83bf87-scannerproject']
-    paths: ['scanner-vpn/**', '.github/workflows/scanner-vpn-preview.yml']
+    paths: ['scanner-vpn/**', '!scanner-vpn/signing/approval.json', '.github/workflows/scanner-vpn-preview.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,29 +22,14 @@ jobs:
         run: |
           mkdir apks
           for abi in arm64-v8a armeabi-v7a x86_64 x86; do
-            apk="scanner-vpn/app/build/outputs/apk/debug/app-$abi-debug.apk"
+            apk="scanner-vpn/app/build/outputs/apk/release/app-$abi-release-unsigned.apk"
             unzip -Z1 "$apk" > entries.txt
             grep -q "^lib/$abi/" entries.txt
             cp "$apk" "apks/Scanner-VPN-$abi.apk"
           done
+      - run: python3 scanner-vpn/scripts/apk-envelope.py request apks
       - uses: actions/upload-artifact@v4
         with:
           name: Scanner-VPN-preview
           path: apks/*.apk
           if-no-files-found: error
-  publish:
-    needs: apk
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: Scanner-VPN-preview
-      - name: Publish phone download
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "scanner-vpn-preview-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" Scanner-VPN-*.apk \
-            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-            --title 'Scanner VPN Android client' --notes 'Debug-signed native VPN client. Requires your own compatible VPN server. See scanner-vpn/README.md for supported profiles.'

@@ -25,3 +25,6 @@ my-upload-key.jks
 # Internal AI Studio build files
 .aistudio/
 /app/libs/
+
+# Offline release signing identity; never commit or upload.
+/.private/
