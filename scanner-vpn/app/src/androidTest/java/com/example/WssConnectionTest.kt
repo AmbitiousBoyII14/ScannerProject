@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
  * Only the WSS port is reversed to the emulator; the proof service isn't accessible directly. */
 @RunWith(AndroidJUnit4::class)
 class WssConnectionTest {
-    @Test fun rejectedRouteThenAuthenticatedForward(){
+    @Test(timeout=100_000) fun rejectedRouteThenAuthenticatedForward(){
         val inst=InstrumentationRegistry.getInstrumentation();val assets=inst.context.assets
         assumeTrue("Run scripts/test-and-build.sh --device to provision the fixture", "ci_gateway.json" in assets.list("").orEmpty())
         val j=assets.open("ci_gateway.json").bufferedReader().use{JSONObject(it.readText())}
@@ -32,15 +32,7 @@ class WssConnectionTest {
         // Exercise the production service start/stop, not only the isolated delay checker.
         val ctx=inst.targetContext
         fun shell(cmd:String)=ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand(cmd)).bufferedReader().use{it.readText()}
-        fun proofFromShellUid():Boolean {
-            val fds=inst.uiAutomation.executeShellCommandRw("toybox nc -w 4 192.0.2.148 22269")
-            return ParcelFileDescriptor.AutoCloseInputStream(fds[0]).use { response ->
-                ParcelFileDescriptor.AutoCloseOutputStream(fds[1]).use { output ->
-                    runCatching {output.write("GET /proof HTTP/1.0\r\nHost: fixture\r\n\r\n".toByteArray());output.flush()}
-                    response.bufferedReader().readLine()?.contains("204 No Content")==true
-                }
-            }
-        }
+        fun proofFromShellUid()=shell("sh /data/local/tmp/scanner-proof.sh").contains("204 No Content")
         assertFalse("Proof socket should be inaccessible without SSH",proofFromShellUid())
         shell("appops set ${ctx.packageName} ACTIVATE_VPN allow") // emulator equivalent of consent
         ctx.getSharedPreferences("debug_storage",0).edit().putBoolean("disabled",true).commit()

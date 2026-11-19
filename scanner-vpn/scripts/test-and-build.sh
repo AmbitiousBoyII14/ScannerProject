@@ -70,6 +70,11 @@ import json,os,pathlib
 pathlib.Path('app/src/androidTest/assets/ci_gateway.json').write_text(json.dumps({k:os.environ[v] for k,v in [('user','SSH_TEST_USER'),('secret','SSH_TEST_PASSWORD'),('hostKey','SSH_TEST_KEY')]}))
 PYFIX
   echo '<resources><string name="vpn_health_url" translatable="false">http://127.0.0.1:22268/proof</string></resources>' > "$dbg/res/values/ci_health.xml"
+  # Shell UID probe with bounded runtime; close stdin without blocking instrumentation's stdout reader.
+  cat > "$work/scanner-proof.sh" <<'PROBE'
+{ printf 'GET /proof HTTP/1.0\r\nHost: fixture\r\n\r\n'; sleep 1; } | toybox timeout 8 toybox nc -w 4 192.0.2.148 22269
+PROBE
+  adb push "$work/scanner-proof.sh" /data/local/tmp/scanner-proof.sh
   adb reverse tcp:22267 tcp:22267
   ./gradlew :app:connectedDebugAndroidTest --no-daemon --console=plain
   python3 - <<'PYCHECK'
