@@ -27,11 +27,11 @@ internal object LiveState {
     @Synchronized fun select(key:String){if(editable() && profiles.containsKey(key))chosen=key}
     @Synchronized fun active()=profiles[chosen]
     fun editable()=status in setOf("Idle","Failed")&&!batchRunning
-    @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=100)list.removeFirst();list.addLast("$stamp  $tag  $text");DebugFile.event("${if(batch) "BATCH" else "VPN"}  $tag  $text")}
+    @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=500)list.removeFirst();list.addLast("$stamp  $tag  $text");DebugFile.event("${if(batch) "BATCH" else "VPN"}  $tag  $text")}
     @Synchronized fun sessionLogText()=logs.joinToString("\n")
     @Synchronized fun clearSessionLog(){logs.clear()}
     @Synchronized fun snapshot()=obj("debugFile" to DebugFile.status,"state" to status,"activeDns" to (active()?.dns?:""),"activeSni" to (active()?.sni?:""),"activeDns2" to (active()?.dns2?:""),"activeUdp" to (active()?.udpGw?:""),"activePayload" to (active()?.payload?:""),"activePath" to (active()?.path?:"/"),"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"results" to arr(*outcomes.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
-    fun resolve(p:Profile,ms:Int):String {val ip=NetworkChecks.resolve(p.host,ms).hostAddress!!;log("DNS","${p.host} → $ip");return ip}
+    fun resolve(p:Profile,ms:Int):String {val addr=NetworkChecks.resolve(p.host,ms);val ip=addr.hostAddress!!;log("DNS","${p.host} → $ip");log("CDN","$ip · ${CdnRanges.label(addr)}");return ip}
     private data class Job(val host:String,val port:Int,val profile:Profile?){val endpoint get()="$host:$port"}
     @Synchronized fun check(context:Context,all:Boolean,text:String?=null,mode:String?=null):Boolean {
         if(!editable())return false
@@ -45,8 +45,9 @@ internal object LiveState {
         val policy=CheckPolicy.read(context);total=jobs.size;completed=0;outcomes.clear();checks.clear();stopBatch=false;batchRunning=true
         executor.execute {try{for(job in jobs){if(stopBatch)break
             val p=job.profile;log("START","${job.endpoint} · ${p?.mode?:"TLS reachability"}",true)
+            var network="DNS unresolved"
             val (tag,detail)=try{policy.run({stopBatch},{n->log("RETRY","${job.endpoint} · retry $n of ${policy.retries}",true)}){
-                val addr=NetworkChecks.resolve(job.host,policy.ms);val ip=addr.hostAddress!!;log("DNS","${job.host} → $ip",true)
+                network="DNS unresolved";val addr=NetworkChecks.resolve(job.host,policy.ms);val ip=addr.hostAddress!!;log("DNS","${job.host} → $ip",true);network="$ip · ${CdnRanges.label(addr)}";log("CDN",network,true)
                 if(stopBatch)throw java.util.concurrent.CancellationException()
                 if(p==null){val start=SystemClock.elapsedRealtime();NetworkChecks.tls(job.host,addr,job.port,policy.ms)
                     "REACHABLE" to "TLS verified · ${SystemClock.elapsedRealtime()-start} ms"
@@ -54,7 +55,7 @@ internal object LiveState {
                     "VERIFIED" to "${p.mode} · HTTPS $delay ms"}
             }}catch(e:Exception){"FAILED" to failureReason(e,"${p?.mode?:"TLS"} check did not complete.")}
             if(stopBatch)break
-            synchronized(this){outcomes.add("$tag  ${job.endpoint}  $detail");completed++;log(tag,"${job.endpoint} · $detail",true)}
+            synchronized(this){outcomes.add("$tag  ${job.endpoint}  $detail · $network");completed++;log(tag,"${job.endpoint} · $detail",true)}
         }}finally{if(stopBatch)log("STOP","Checks cancelled",true);batchRunning=false}}
         return true
     }

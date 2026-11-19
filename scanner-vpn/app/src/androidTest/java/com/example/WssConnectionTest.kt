@@ -17,6 +17,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class WssConnectionTest {
     @Test(timeout=100_000) fun rejectedRouteThenAuthenticatedForward(){
+        assertTrue(CdnRanges.label(java.net.InetAddress.getByName("172.67.161.217")).contains("Cloudflare"))
         val inst=InstrumentationRegistry.getInstrumentation();val assets=inst.context.assets
         assumeTrue("Run scripts/test-and-build.sh --device to provision the fixture", "ci_gateway.json" in assets.list("").orEmpty())
         val j=assets.open("ci_gateway.json").bufferedReader().use{JSONObject(it.readText())}
@@ -44,7 +45,7 @@ class WssConnectionTest {
                 assertTrue(bridge.setConnectionPolicy(4,true,1));assertEquals(CheckPolicy(4,true,1),CheckPolicy.read(ctx))
                 assertTrue(bridge.checkList("localhost:22267\n127.0.0.1:1","SSH WS TLS"))
                 for(n in 0..160){if(!LiveState.batchRunning)break;Thread.sleep(100)}
-                val batch=JSONObject(bridge.snapshot());assertEquals(2,batch.getInt("completed"));val rows=batch.getJSONArray("results")
+                val batch=JSONObject(bridge.snapshot());assertTrue(batch.getJSONArray("results").getString(0).contains("Non-CDN"));assertEquals(2,batch.getInt("completed"));val rows=batch.getJSONArray("results")
                 assertTrue(rows.toString(),rows.getString(0).startsWith("REACHABLE"));assertTrue(rows.getString(1).startsWith("FAILED"));assertTrue(batch.getJSONArray("checks").toString().contains("retry 1 of 1"))
             }finally{oldPolicy.save(ctx)}
             assertNull("Emulator VPN consent",VpnService.prepare(activity));LiveState.save(p)
