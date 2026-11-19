@@ -5,6 +5,10 @@ src=c56b307083940acc16db257de9290f69d841763a
 output="$(pwd)/Scanner-VPN-1.14-Android-project.zip"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 git archive "$src" scanner-vpn .github/workflows/scanner-vpn-{preview,sign}.yml | tar -x -C "$tmp"
+# Preview is generated from the same shipped UI; fail rather than package a stale demo.
+git diff --exit-code "$src" HEAD -- scanner-vpn/app/src/main/assets/live
+python3 tools/build-vpn-preview.py --check
+git archive HEAD web-preview Scanner-VPN-Demo.html tools/build-vpn-preview.py | tar -x -C "$tmp"
 project="$tmp/scanner-vpn"
 "$project/scripts/fetch-core.sh"
 echo 'cdfef146218233a31a8b52c8b1016557730d3b63fc121d4c84cacea50e669155  app/libs/libv2ray.aar' | (cd "$project" && sha256sum -c -)
@@ -29,11 +33,14 @@ app/src/main/assets/live/ is the shipped WebView UI. It calls the native Android
 app/libs/libv2ray.aar is the SHA-256-verified native dependency used by 1.14.
 upstream-src/ contains the pinned native engine, Android bindings, SSH and WebSocket
 library source trees, with their licenses. These are reference sources, not additional
-Gradle modules. No web preview, private signing key, or user account data is needed.
+Gradle modules. No private signing key or user account data is included.
+
+Open Scanner-VPN-Demo.html to preview the 1.14 UI offline (simulated only).
+web-preview/ contains the multi-file browser preview. See web-preview/README.md.
 
 Build: see scanner-vpn/README.md. Build tools, Gradle/Maven dependencies, and Go
 transitive dependencies are not vendored. This isn't an offline Android SDK.
 DOC
-(cd "$tmp" && zip -q -r "$tmp/bundle.zip" START-HERE.txt scanner-vpn .github)
+(cd "$tmp" && zip -q -r "$tmp/bundle.zip" START-HERE.txt scanner-vpn .github web-preview Scanner-VPN-Demo.html tools)
 unzip -tq "$tmp/bundle.zip" >/dev/null
 mv "$tmp/bundle.zip" "$output"
