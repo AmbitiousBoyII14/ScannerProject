@@ -2,7 +2,7 @@ name: Package Scanner VPN 1.14 Android project and engine
 on:
   push:
     branches: ['arena/5c83bf87-scannerproject']
-    paths: ['web-preview/**', 'Scanner-VPN-Demo.html', 'tools/build-vpn-preview.py', 'tools/package-vpn-1.14-source.sh', '.github/workflows/scanner-vpn-full-source.yml']
+    paths: ['tools/package-vpn-1.14-source.sh']
 permissions:
   contents: write
 jobs:

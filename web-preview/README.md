@@ -1,4 +1,5 @@
-# Scanner VPN 1.14 browser preview
-Open `../Scanner-VPN-Demo.html` directly for the standalone, offline demo. Or serve this directory with a static HTTP server and open `index.html`. Select **Load example SSH account → Connect → Log**. Batch accepts domains; `.invalid` demonstrates a failure. All network results are simulated. Browser-only settings and example accounts are in memory, not stored on disk. Native VPN, overlay, notification, file logging and real Xray config generation require Android.
+# Scanner VPN 1.15 browser simulation
 
-To redesign the shipped app, edit `scanner-vpn/app/src/main/assets/live/`, not the generated copies here. `app.js` is the preview-only Android bridge substitute. Run `python3 tools/build-vpn-preview.py` from the extracted project or repository to refresh both browser entries.
+`Scanner-VPN-Demo.html` is the offline, single-file browser build. `index.html` in this directory is its multi-file equivalent for HTTP hosting. Both use the shipped Android UI from `scanner-vpn/app/src/main/assets/live/` with a **browser-only simulated bridge**, not a VPN. Do not use real credentials. The approved original design reference is `design-preview/Scanner-VPN-Preview.html`.
+
+Regenerate: `python3 tools/build-vpn-preview.py`. Check: `python3 tools/build-vpn-preview.py --check`.
