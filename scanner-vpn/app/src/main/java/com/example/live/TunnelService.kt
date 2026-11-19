@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit
 
 class TunnelService:VpnService(){
     private val healthUrl by lazy { getString(com.example.R.string.vpn_health_url) }
+    private val main=android.os.Handler(android.os.Looper.getMainLooper())
     private val worker=ScheduledThreadPoolExecutor(1)
     @Volatile private var stopping=false
     private var core:CoreController?=null
@@ -33,13 +34,13 @@ class TunnelService:VpnService(){
             val engine=Libv2ray.newCoreController(object:CoreCallbackHandler{override fun startup()=0L;override fun shutdown()=0L;override fun onEmitStatus(code:Long,msg:String?)=0L});core=engine
             engine.startLoop(cfg,tun!!.fd);LiveState.log("TUN","Android interface active; checking outbound through ${p.host}:${p.port}");if(stopping)return@run
             LiveState.ms=engine.measureDelay(healthUrl).also{check(it>=0)};if(stopping)return@run
-            LiveState.status="Connected";LiveState.since=SystemClock.elapsedRealtime();lastSample=LiveState.since;lastHealth=lastSample
+            LiveState.status="Connected";main.post{if(!stopping)FloatingShortcut.tunnel(this,true)};LiveState.since=SystemClock.elapsedRealtime();lastSample=LiveState.since;lastHealth=lastSample
             LiveState.log("ONLINE","Verified ${p.label} · ${LiveState.ms} ms");getSystemService(NotificationManager::class.java).notify(73,notice("Connected · ${p.host}"));worker.scheduleWithFixedDelay({sample()},1,1,TimeUnit.SECONDS);Unit
         }}catch(e:Exception){if(!stopping)fail(e)}};return START_NOT_STICKY
     }
     private fun sample(){if(stopping)return;val engine=core?:return;try{val now=SystemClock.elapsedRealtime();val scale=1.0/(now-lastSample).coerceAtLeast(1);lastSample=now;var up=0.0;var down=0.0;engine.queryAllOutboundTrafficStats().split(';').forEach{val f=it.split(',');if(f.size==3&&f[0]=="vpn"){val v=(f[2].toLongOrNull()?:0)*scale;if(f[1]=="uplink")up+=v else if(f[1]=="downlink")down+=v}};LiveState.up=up;LiveState.down=down;if(now-lastHealth>=60000){lastHealth=now;LiveState.ms=engine.measureDelay(healthUrl).also{check(it>=0)}}}catch(e:Exception){if(!stopping)fail(e)}}
-    private fun fail(e:Exception){stopping=true;LiveState.log("ERROR",failureReason(e,"Could not verify HTTPS through this profile. Confirm the server supports the selected protocol and the check site is reachable."));cleanup();LiveState.status="Failed";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
-    private fun stopTunnel(){if(stopping)return;stopping=true;LiveState.status="Stopping";worker.execute{cleanup();LiveState.log("STOP","Tunnel closed");LiveState.status="Idle";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}}
+    private fun fail(e:Exception){stopping=true;main.post{FloatingShortcut.tunnel(this,false)};LiveState.log("ERROR",failureReason(e,"Could not verify HTTPS through this profile. Confirm the server supports the selected protocol and the check site is reachable."));cleanup();LiveState.status="Failed";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
+    private fun stopTunnel(){if(stopping)return;stopping=true;main.post{FloatingShortcut.tunnel(this,false)};LiveState.status="Stopping";worker.execute{cleanup();LiveState.log("STOP","Tunnel closed");LiveState.status="Idle";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}}
     override fun onRevoke(){stopTunnel()}
-    override fun onDestroy(){stopping=true;worker.execute{cleanup();if(LiveState.status!="Failed")LiveState.status="Idle"};worker.shutdown();super.onDestroy()}
+    override fun onDestroy(){stopping=true;FloatingShortcut.tunnel(this,false);worker.execute{cleanup();if(LiveState.status!="Failed")LiveState.status="Idle"};worker.shutdown();super.onDestroy()}
 }

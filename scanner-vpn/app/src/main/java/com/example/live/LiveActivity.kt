@@ -38,7 +38,17 @@ class LiveActivity:Activity(){
             } catch(e:Exception){runOnUiThread{Toast.makeText(this,"Could not import. Use a UTF-8 text file under 64 KiB.",Toast.LENGTH_LONG).show()}}
         }.start()
     }
-    override fun onResume(){super.onResume();HostPins.foreground=this}
+    override fun onStart(){super.onStart();FloatingShortcut.screen(this,true)}
+    override fun onStop(){FloatingShortcut.screen(this,false);super.onStop()}
+    private fun syncShortcut(){if(!isDestroyed)web.evaluateJavascript("if(typeof syncFloating==='function')syncFloating()",null)}
+    override fun onResume(){super.onResume();HostPins.foreground=this;syncShortcut()}
+    private fun setShortcut(on:Boolean){
+        if(on && !android.provider.Settings.canDrawOverlays(this)){
+            try{startActivityForResult(Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,android.net.Uri.parse("package:$packageName")),45)}
+            catch(_:android.content.ActivityNotFoundException){Toast.makeText(this,"Overlay permission settings unavailable",Toast.LENGTH_LONG).show();syncShortcut()};return
+        }
+        prefs.edit().putBoolean(FloatingShortcut.KEY,on).apply();FloatingShortcut.refresh(this);syncShortcut()
+    }
     override fun onPause(){if(HostPins.foreground===this)HostPins.foreground=null;super.onPause()}
     private fun enroll(raw:String){
         val ok=runCatching {val p=Profile.read(raw,forDiscovery=true);require(p.isSsh);LiveState.save(p)}.isSuccess
@@ -86,6 +96,14 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun choose(key:String)=LiveState.select(key)
         @JavascriptInterface fun checks(all:Boolean)=LiveState.check(applicationContext,all)
         @JavascriptInterface fun checkList(text:String,mode:String)=LiveState.check(applicationContext,true,text,mode)
+        @JavascriptInterface fun floatingEnabled()=FloatingShortcut.enabled(this@LiveActivity)
+        @JavascriptInterface fun setFloating(on:Boolean){runOnUiThread{setShortcut(on)}}
+        @JavascriptInterface fun backgroundVpn(){runOnUiThread{if(LiveState.status=="Connected")moveTaskToBack(true)}}
+        @JavascriptInterface fun notificationOptions(){runOnUiThread{
+            if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED && (!prefs.getBoolean("askedNotices",false)||shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS))){
+                prefs.edit().putBoolean("askedNotices",true).apply();requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),46)
+            }else{val i=if(Build.VERSION.SDK_INT>=26)Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,packageName) else Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName"));runCatching{startActivity(i)}}
+        }}
         @JavascriptInterface fun connectionPolicy()=CheckPolicy.read(this@LiveActivity).let{obj("seconds" to it.seconds,"auto" to it.auto,"retries" to it.retries).toString()}
         @JavascriptInterface fun setConnectionPolicy(seconds:Int,auto:Boolean,retries:Int)=runCatching{CheckPolicy(seconds,auto,retries).save(this@LiveActivity)}.getOrDefault(false)
         @JavascriptInterface fun preferences()=org.json.JSONObject().apply {prefKeys.forEach{put(it,prefs.getBoolean(it,defaultValue(it)))}}.toString()
@@ -96,6 +114,6 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun disconnect(){runOnUiThread{if(LiveState.status in listOf("Starting","Connected"))startService(Intent(this@LiveActivity,TunnelService::class.java).setAction("stop"))}}
     }
     private fun startTunnel(){if(!LiveState.editable()||LiveState.active()==null)return;LiveState.status="Starting";LiveState.log("START",LiveState.active()!!.label);try{val i=Intent(this,TunnelService::class.java).setAction("connect");if(Build.VERSION.SDK_INT>=26)startForegroundService(i) else startService(i)}catch(e:Exception){LiveState.status="Failed";LiveState.log("ERROR","Android blocked VPN startup")}}
-    override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==44&&result==RESULT_OK)data?.data?.let{uri->try{require(uri.authority=="com.android.externalstorage.documents");contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);DebugFile.configure(uri)}catch(e:Exception){Toast.makeText(this,"Choose a folder on local device storage.",Toast.LENGTH_LONG).show()}};if(request==43 && result==RESULT_OK)data?.data?.let(::importDocument);if(request==42){if(result==RESULT_OK)startTunnel() else LiveState.log("STOP","VPN permission not granted")}}
+    override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==45){val ok=android.provider.Settings.canDrawOverlays(this);setShortcut(ok);if(!ok)Toast.makeText(this,"Floating icon is off. Background VPN does not need this permission.",Toast.LENGTH_LONG).show()};if(request==44&&result==RESULT_OK)data?.data?.let{uri->try{require(uri.authority=="com.android.externalstorage.documents");contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);DebugFile.configure(uri)}catch(e:Exception){Toast.makeText(this,"Choose a folder on local device storage.",Toast.LENGTH_LONG).show()}};if(request==43 && result==RESULT_OK)data?.data?.let(::importDocument);if(request==42){if(result==RESULT_OK)startTunnel() else LiveState.log("STOP","VPN permission not granted")}}
     override fun onDestroy(){web.removeJavascriptInterface("Client");web.destroy();super.onDestroy()}
 }

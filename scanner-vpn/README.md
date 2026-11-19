@@ -4,6 +4,10 @@
 
 This directory (`scanner-vpn/`) is the Gradle project to open. The repository-root `app/` is a different application; `web-preview/` is a simulation. The Android app here uses a bundled WebView for controls and a native `VpnService` for traffic. Package: `com.scannervpn.android`; minimum Android 7.0 (API 24).
 
+## 1.14 · Background VPN & optional shortcut
+
+After **Connected**, press Home, switch apps, or use **Settings & debug file → Continue in background**. The user-started VPN foreground service owns the tunnel, independent of the activity. Enable its ongoing notification from the same settings to return or disconnect. **Floating VPN icon over other apps** is off by default and requests Android's display-over-other-apps permission only on opt-in. It appears only outside the app during a verified connection. Tap to return or drag to reposition. Disconnect, failure or revocation of the VPN removes it. Denying overlay permission does not stop the VPN. This is not a boot launcher or a way to survive force-stop, OS termination, loss of network or OEM power restrictions.
+
 ## 1.13 · V2ray settings
 
 Select **V2ray → Edit profile → Paste / import link**. VLESS, VMess (base64 JSON) and Trojan support separate TCP server address, WebSocket Host/path and TLS SNI. The form supports TCP/WS, Mux and verified TLS (mandatory for Trojan). SIP002 Shadowsocks import is limited to chacha20-ietf-poly1305 without plugins. REALITY, Vision/flow, gRPC, XHTTP and unhandled link extensions are not silently converted. The included Xray v26.11.9 removed `allowInsecure`; importing such a link requires explicit approval to use verified TLS. A certificate SHA-256 pin may be set manually. Use **〈 〉 JSON** to inspect/copy the config made by the native profile builder; unlike a generic outbound snippet, it includes Android routing and the configured connection policy. JSON contains the login/UUID. No example account is bundled or tested. The editor and parser are in [core-editor.js](app/src/main/assets/live/core-editor.js).

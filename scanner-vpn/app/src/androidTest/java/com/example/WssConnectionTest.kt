@@ -68,7 +68,18 @@ class WssConnectionTest {
             assertEquals(LiveState.sessionLogText().takeLast(650),"Connected",LiveState.status)
             assertEquals(k.first,pins.getString(id,null));assertFalse(pins.contains(legacy))
             assertEquals("Trust and authenticate on one TCP connection",1,LiveState.sessionLogText().lines().count{it.contains("  TCP  Connected to")})
-            assertTrue("A second UID must receive the SSH-only 204 through the Android TUN",proofFromShellUid())
+            fun waitFor(message:String,predicate:()->Boolean){repeat(80){var ok=false;inst.runOnMainSync{ok=predicate()};if(ok)return;Thread.sleep(100)};fail(message)}
+            assertFalse(bridge.floatingEnabled());bridge.backgroundVpn()
+            waitFor("App backgrounded without bubble"){HostPins.foreground==null && !FloatingShortcut.shown}
+            assertTrue("Another UID reaches the SSH-only endpoint in background without overlay",proofFromShellUid())
+            shell("am start -n ${ctx.packageName}/${LiveActivity::class.java.name}");waitFor("Activity visible again"){HostPins.foreground!=null}
+            shell("appops set ${ctx.packageName} SYSTEM_ALERT_WINDOW allow");bridge.setFloating(true)
+            waitFor("Opt-in persisted"){bridge.floatingEnabled()};shell("input keyevent KEYCODE_HOME")
+            waitFor("Overlay attached after Home"){FloatingShortcut.shown};assertTrue("Tunnel works with shortcut shown",proofFromShellUid())
+            assertEquals("Connected",LiveState.status);bridge.disconnect()
+            waitFor("Disconnect removes shortcut"){!FloatingShortcut.shown && LiveState.status=="Idle"}
+            bridge.setFloating(false)
+
         }finally{
             activity.Bridge().disconnect();for(n in 0..50){if(LiveState.status in setOf("Idle","Failed"))break;Thread.sleep(100)}
             inst.runOnMainSync{activity.finish()}
