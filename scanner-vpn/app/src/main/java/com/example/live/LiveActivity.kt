@@ -31,7 +31,38 @@ class LiveActivity:Activity(){
             } catch(e:Exception){runOnUiThread{Toast.makeText(this,"Could not import. Use a UTF-8 text file under 64 KiB.",Toast.LENGTH_LONG).show()}}
         }.start()
     }
+    private val pins by lazy { getSharedPreferences("known_ssh_servers", MODE_PRIVATE) }
+    private var enrolling=false // Accessed only on the UI thread.
+    private fun enrollmentResult(message:String,ok:Boolean){
+        enrolling=false
+        if(!isFinishing&&!isDestroyed)web.evaluateJavascript("sshResult("+org.json.JSONObject.quote(message)+",$ok)",null)
+    }
+    private fun enroll(raw:String){
+        if(enrolling)return
+        enrolling=true
+        try{
+            val profile=Profile.read(raw,forDiscovery=true);require(profile.mode=="SSH" && LiveState.editable())
+            val endpoint="${profile.host}:${profile.port}"
+            fun save(key:String){
+                try{val j=org.json.JSONObject(raw).put("hostKey",key);LiveState.save(Profile.read(j.toString()));pins.edit().putString(endpoint,key).apply();enrollmentResult("SSH profile selected.",true)}
+                catch(e:Exception){enrollmentResult("Could not save the profile. Stop active connections and check the fields.",false)}
+            }
+            val existing=pins.getString(endpoint,null)
+            if(existing!=null){save(existing);return}
+            Thread {
+                try{val (key,fp)=SshTransport.discover(profile.host,profile.port)
+                    runOnUiThread{if(!isFinishing&&!isDestroyed){
+                        android.app.AlertDialog.Builder(this).setTitle("Trust this SSH server?")
+                            .setMessage("$endpoint\n\nKey type: ${key.substringBefore(' ')}\nFingerprint: $fp\n\nCompare this fingerprint with your provider before trusting it. No password has been sent.")
+                            .setPositiveButton("Trust & save"){_,_->save(key)}.setNegativeButton("Cancel"){_,_->enrollmentResult("Server not trusted. No profile saved.",false)}
+                            .setOnCancelListener{enrollmentResult("Server not trusted.",false)}.show()
+                    }}
+                }catch(e:Exception){runOnUiThread{enrollmentResult("No SSH host key received. Check the address and direct SSH port. No password was sent.",false)}}
+            }.start()
+        }catch(e:Exception){enrollmentResult("Check the account format, server, port and username. Stop active sessions before saving.",false)}
+    }
     inner class Bridge{
+        @JavascriptInterface fun enrollSsh(raw:String){runOnUiThread{enroll(raw)}}
         @JavascriptInterface fun snapshot()=LiveState.snapshot()
         @JavascriptInterface fun save(raw:String):Boolean=runCatching{LiveState.save(Profile.read(raw));true}.getOrDefault(false)
         @JavascriptInterface fun choose(key:String)=LiveState.select(key)

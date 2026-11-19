@@ -33,10 +33,10 @@ class TunnelService:VpnService(){
             LiveState.ms=engine.measureDelay(CHECK_URL);if(stopping)return@execute
             LiveState.status="Connected";LiveState.since=SystemClock.elapsedRealtime();lastSample=LiveState.since;lastHealth=lastSample
             LiveState.log("ONLINE","Verified ${p.label} · ${LiveState.ms} ms");getSystemService(NotificationManager::class.java).notify(73,notice("Connected · ${p.host}"));worker.scheduleWithFixedDelay({sample()},1,1,TimeUnit.SECONDS)
-        }catch(e:Exception){if(!stopping)fail()}};return START_NOT_STICKY
+        }catch(e:Exception){if(!stopping)fail(e)}};return START_NOT_STICKY
     }
-    private fun sample(){if(stopping)return;val engine=core?:return;try{val now=SystemClock.elapsedRealtime();val scale=1.0/(now-lastSample).coerceAtLeast(1);lastSample=now;var up=0.0;var down=0.0;engine.queryAllOutboundTrafficStats().split(';').forEach{val f=it.split(',');if(f.size==3&&f[0]=="vpn"){val v=(f[2].toLongOrNull()?:0)*scale;if(f[1]=="uplink")up+=v else if(f[1]=="downlink")down+=v}};LiveState.up=up;LiveState.down=down;if(now-lastHealth>=60000){lastHealth=now;LiveState.ms=engine.measureDelay(CHECK_URL)}}catch(e:Exception){if(!stopping)fail()}}
-    private fun fail(){stopping=true;LiveState.log("ERROR","Tunnel verification failed. Check endpoint, credentials, TLS and connectivity.");cleanup();LiveState.status="Failed";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
+    private fun sample(){if(stopping)return;val engine=core?:return;try{val now=SystemClock.elapsedRealtime();val scale=1.0/(now-lastSample).coerceAtLeast(1);lastSample=now;var up=0.0;var down=0.0;engine.queryAllOutboundTrafficStats().split(';').forEach{val f=it.split(',');if(f.size==3&&f[0]=="vpn"){val v=(f[2].toLongOrNull()?:0)*scale;if(f[1]=="uplink")up+=v else if(f[1]=="downlink")down+=v}};LiveState.up=up;LiveState.down=down;if(now-lastHealth>=60000){lastHealth=now;LiveState.ms=engine.measureDelay(CHECK_URL)}}catch(e:Exception){if(!stopping)fail(e)}}
+    private fun fail(e:Exception){stopping=true;LiveState.log("ERROR",failureReason(e,"Could not verify HTTPS through this profile. Confirm the server supports the selected protocol and the check site is reachable."));cleanup();LiveState.status="Failed";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}
     private fun stopTunnel(){if(stopping)return;stopping=true;LiveState.status="Stopping";worker.execute{cleanup();LiveState.log("STOP","Tunnel closed");LiveState.status="Idle";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}}
     override fun onRevoke(){stopTunnel()}
     override fun onDestroy(){stopping=true;worker.execute{cleanup();if(LiveState.status!="Failed")LiveState.status="Idle"};worker.shutdown();super.onDestroy()}

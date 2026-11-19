@@ -25,6 +25,17 @@ internal class SshTransport private constructor(private val session:Session):Clo
     @Volatile private var closed=false
 
     companion object {
+        // A fresh JSch instance, empty trust repository and strict checking: abort at
+        // key exchange, before user authentication. Only that specific rejection is expected.
+        fun discover(host:String,port:Int):Pair<String,String> {
+            val jsch=JSch();val probe=jsch.getSession("host-key-check",host,port)
+            probe.setConfig("StrictHostKeyChecking","yes");probe.setConfig("PreferredAuthentications","none")
+            try { probe.connect(10000);error("Unexpected trusted key on discovery") }
+            catch(e:com.jcraft.jsch.JSchUnknownHostKeyException){
+                val key=requireNotNull(probe.hostKey)
+                return "${key.type} ${key.key}" to key.getFingerPrint(jsch)
+            } finally {probe.disconnect()}
+        }
         fun open(ip:String,port:Int,user:String,password:String,hostKey:String):SshTransport {
             val ssh=JSch();val alias="scanner-profile"
             val fields=hostKey.trim().split(Regex("\\s+"));require(fields.size>=2)

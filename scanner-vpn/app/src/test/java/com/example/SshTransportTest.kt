@@ -12,6 +12,7 @@ class SshTransportTest {
     private fun profile(key:String,password:String):Profile=Profile.read(obj("mode" to "SSH","host" to "127.0.0.1","port" to 22257,"user" to System.getenv("SSH_TEST_USER"),"secret" to password,"hostKey" to key).toString())
     @Test fun realSshForwardingWithLiteralUrlPassword(){
         val key=System.getenv("SSH_TEST_KEY");assumeNotNull(key)
+        val discovered=SshTransport.discover("127.0.0.1",22257);assertEquals(key.split(" ").take(2).joinToString(" "),discovered.first);assertTrue(discovered.second.isNotBlank())
         val pass=System.getenv("SSH_TEST_PASSWORD");val p=profile(key,pass)
         // Authentication and host verification fail closed; no local proxy on failure.
         assertThrows(Exception::class.java){profile(key,"not-the-password").openSsh("127.0.0.1")?.close()}
