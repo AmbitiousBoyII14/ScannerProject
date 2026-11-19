@@ -24,3 +24,19 @@ jobs:
           name: Scanner-VPN-preview
           path: Scanner-VPN-preview.apk
           if-no-files-found: error
+  publish:
+    needs: apk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Scanner-VPN-preview
+      - name: Publish phone download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "scanner-vpn-preview-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" Scanner-VPN-preview.apk \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title 'Scanner VPN Android preview' --notes 'Debug-signed UI preview. SSH authentication is not implemented.'
