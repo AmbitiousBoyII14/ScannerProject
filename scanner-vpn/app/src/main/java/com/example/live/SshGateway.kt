@@ -3,7 +3,7 @@ package com.example.live
 import com.jcraft.jsch.Proxy
 import com.jcraft.jsch.SocketFactory
 import org.java_websocket.client.WebSocketClient
-import org.java_websocket.drafts.Draft_6455
+import java.util.concurrent.atomic.AtomicReference
 import org.java_websocket.handshake.ServerHandshake
 import java.io.*
 import java.net.*
@@ -38,14 +38,14 @@ internal class SshGateway(private val peer:String,private val tls:Boolean,privat
                 if(lines.none{it.substringBefore(':').equals("upgrade",true)&&it.substringAfter(':').trim().equals(req.upgrade,true)})throw GatewayFailure("HTTP 101 without the requested Upgrade header")
                 event("HTTP","HTTP 101 · waiting for raw SSH identification");return
             }
-            val uri=URI("${if(tls) "wss" else "ws"}://${req.authority}${req.path}");var problem="WebSocket handshake rejected; check gateway and path"
-            val w=object:WebSocketClient(uri,Draft_6455(emptyList(),1048576),req.headers+mapOf("Host" to req.authority),timeout){
+            val uri=URI("${if(tls) "wss" else "ws"}://${req.authority}${req.path}");val problem=AtomicReference<String?>(null)
+            val w=object:WebSocketClient(uri,GatewayDraft(req.binaryProtocol){problem.set(it)},req.headers+mapOf("Host" to req.authority),timeout){
                 override fun onOpen(h:ServerHandshake){event("WS","HTTP ${h.httpStatus} · binary WebSocket open")}
                 override fun onMessage(text:String){end();closeConnection(1003,"Binary SSH stream required")}
                 override fun onMessage(data:ByteBuffer){val bytes=ByteArray(data.remaining());data.get(bytes);if(bytes.isNotEmpty())while(!ended&&!chunks.offer(bytes,200,TimeUnit.MILLISECONDS)){} }
-                override fun onClose(code:Int,reason:String?,remote:Boolean){val status=Regex("(?i)(?:status(?: code)?(?: received)?[: ]+)([0-9]{3})").find(reason.orEmpty())?.groupValues?.get(1);if(status!=null)problem="HTTP $status · WebSocket upgrade refused";end()}
-                override fun onError(e:Exception){end()}
-            };client=w;w.setSocket(socket);if(!w.connectBlocking(timeout.toLong(),TimeUnit.MILLISECONDS))throw GatewayFailure(problem);socket.soTimeout=0
+                override fun onClose(code:Int,reason:String?,remote:Boolean){end()}
+                override fun onError(e:Exception){problem.compareAndSet(null,failureReason(e,"WebSocket I/O failed before the upgrade completed."));end()}
+            };client=w;w.setSocket(socket);if(!w.connectBlocking(timeout.toLong(),TimeUnit.MILLISECONDS))throw GatewayFailure(problem.get()?:"No valid WebSocket upgrade completed before the connection closed or timed out. Confirm the gateway Host, path and framing.");socket.soTimeout=0
             source=object:InputStream(){var part=ByteArray(0);var pos=0
                 override fun read():Int{val b=ByteArray(1);return if(read(b)<0)-1 else b[0].toInt() and 255}
                 override fun read(b:ByteArray,off:Int,len:Int):Int{if(len==0)return 0;while(pos==part.size){if(ended&&chunks.isEmpty())return -1;part=chunks.poll(12,TimeUnit.SECONDS)?:throw SocketTimeoutException();pos=0};val n=minOf(len,part.size-pos);part.copyInto(b,off,pos,pos+n);pos+=n;return n}}

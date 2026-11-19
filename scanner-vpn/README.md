@@ -47,3 +47,9 @@ Paste the whole SSH account into the visible account line; **Copy / Paste / Hide
 - **UDPgw settings** takes the provider's badvpn-udpgw IPv4:port on the remote side of SSH. With it enabled, the local authenticated SOCKS adapter can relay IPv4 UDP via direct-tcpip to that gateway. Generic UDP is otherwise off for SSH. A TCP forwarding channel opening is logged as such, not as proof of UDP delivery.
 
 The APK build tests raw HTTP-upgrade-over-TLS, WSS, direct SSH/TLS, VLESS, and a UDP echo round trip through a disposable OpenSSH server and upstream badvpn-udpgw. The Android instrumentation test drives the installed WebView, uses the real clipboard, edits the payload/SNI/DNS/UDPgw, and checks a refused upgrade without sending credentials. Tests never use a provider account.
+
+### 1.7: WebSocket upgrade diagnostics and session log tools
+
+Log → **Copy** copies the current session lines only. **Clear** asks for confirmation and clears the in-memory session log, not the VPN connection, batch results or on-disk `debug.txt`. Binary WebSocket now reports observed HTTP refusal codes, malformed 101 upgrades, or missing responses separately. For providers that explicitly require it, the payload editor accepts `Sec-WebSocket-Protocol: binary`; leaving it out preserves ordinary RFC 6455 behavior. No automatic protocol downgrade, auth retries or path guessing.
+
+`./scripts/test-and-build.sh --device` (disposable Linux CI runner with a running emulator) provisions a loopback WSS gateway with a route and mandatory binary subprotocol. The installed Android test reproduces 404 and 426 responses, discovers and verifies the SSH host key, logs in to OpenSSH and checks an HTTP 204 via the native Xray outbound and SSH forwarding. No provider credentials are used. The ephemeral test CA is scoped to localhost in the instrumentation build only; nothing is added to the released trust store. This outbound test does not assert device-wide routing.

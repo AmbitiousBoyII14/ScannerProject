@@ -26,8 +26,17 @@ async def raw_upgrade(reader,writer):
     if not request.startswith(b'GET /ssh HTTP/1.1\r\n') or b'x-fixture: proof' not in request.lower():
         writer.write(b'HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n');await writer.drain();writer.close();return
     writer.write(b'HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: ssh\r\n\r\n');await writer.drain();await tls(reader,writer)
+def enforce_route(conn,request):
+    if request.path!='/ssh':return conn.respond(404,'Not Found')
+    if request.headers.get('Sec-WebSocket-Protocol')!='binary':return conn.respond(426,'Binary subprotocol required')
+
+async def proof(reader,writer):
+    try:
+        await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'),4)
+        writer.write(b'HTTP/1.1 204 No Content\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');await writer.drain()
+    finally:writer.close()
 async def main():
     d=pathlib.Path(sys.argv[1]);ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.load_cert_chain(d/'cert.pem',d/'key.pem')
-    async with serve(ws,'127.0.0.1',22258),serve(ws,'127.0.0.1',22259,ssl=ctx),await asyncio.start_server(tls,'127.0.0.1',22260,ssl=ctx),await asyncio.start_server(raw_upgrade,'127.0.0.1',22261,ssl=ctx):
+    async with serve(ws,'127.0.0.1',22258),serve(ws,'127.0.0.1',22259,ssl=ctx),serve(ws,'127.0.0.1',22267,ssl=ctx,subprotocols=['binary'],process_request=enforce_route),await asyncio.start_server(proof,'127.0.0.1',22268),await asyncio.start_server(tls,'127.0.0.1',22260,ssl=ctx),await asyncio.start_server(raw_upgrade,'127.0.0.1',22261,ssl=ctx):
         (d/'ready').touch();await asyncio.Future()
 asyncio.run(main())

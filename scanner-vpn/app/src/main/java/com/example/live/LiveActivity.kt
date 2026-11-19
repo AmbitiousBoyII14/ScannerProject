@@ -70,6 +70,11 @@ class LiveActivity:Activity(){
         }catch(e:Exception){enrollmentResult("Check the account format, server, port and username. Stop active sessions before saving.",false)}
     }
     inner class Bridge{
+        @JavascriptInterface fun clearSessionLog()=LiveState.clearSessionLog()
+        @JavascriptInterface fun copySessionLog(){val text=LiveState.sessionLogText();if(text.isEmpty())return;runOnUiThread{
+            val clip=android.content.ClipData.newPlainText("Scanner VPN session log",text);clip.description.extras=android.os.PersistableBundle().apply{putBoolean("android.content.extra.IS_SENSITIVE",true)};getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(clip)
+            Toast.makeText(this@LiveActivity,"Session log copied",Toast.LENGTH_SHORT).show()
+        }}
         @JavascriptInterface fun copyAccount(value:String){if(value.isEmpty()||value.length>16384)return;runOnUiThread{
             val clip=android.content.ClipData.newPlainText("SSH account",value);if(Build.VERSION.SDK_INT>=24)clip.description.extras=android.os.PersistableBundle().apply{putBoolean("android.content.extra.IS_SENSITIVE",true)};getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(clip)
         }}

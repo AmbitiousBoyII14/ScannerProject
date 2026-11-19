@@ -32,12 +32,17 @@ class AccountFlowTest {
             val account="127.0.0.1:${server.localPort}@fixture:a@:https://example.test/password"
             inst.runOnMainSync{ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("fixture",account))}
             js("document.getElementById('paste').click()");until("document.getElementById('account').value.endsWith('example.test/password')");assertEquals("\"text\"",js("document.getElementById('account').type"))
-            js("document.querySelector('[data-tool=payload]').click()");js("document.querySelector('#body select').value='http';document.querySelector('#body textarea').value='GET /fixture HTTP/1.1[crlf]Host: [host][crlf]Connection: Upgrade[crlf]Upgrade: ssh';document.querySelector('#body .apply').click()")
+            js("document.querySelector('[data-tool=payload]').click()");js("document.querySelector('#body select').value='ws';document.querySelector('#body textarea').value='GET /fixture HTTP/1.1[crlf]Host: [host][crlf]Connection: Upgrade[crlf]Upgrade: websocket';document.querySelector('#body .apply').click()")
             until("!document.getElementById('sheet').open")
-            js("document.querySelector('[data-tool=sni]').click();document.querySelector('#body input').value='localhost';document.querySelector('#body .apply').click()");until("document.getElementById('profile').textContent==='SSH HTTP TLS'")
+            js("document.querySelector('[data-tool=sni]').click();document.querySelector('#body input').value='localhost';document.querySelector('#body .apply').click()");until("document.getElementById('profile').textContent==='SSH WS TLS'")
             // Local 403 fixture is deliberately plain HTTP.
             js("document.querySelectorAll('#flags input')[1].click();document.querySelector('[data-tool=dns]').click();document.querySelectorAll('#body input')[1].value='9.9.9.9';document.querySelector('#body .apply').click()");js("document.querySelector('[data-tool=udp]').click();document.querySelector('#body .apply').click();document.getElementById('connect').click()")
             assertEquals("GET /fixture HTTP/1.1",received.poll(15,TimeUnit.SECONDS));until("document.getElementById('events').textContent.includes('HTTP 403')");assertEquals("false",js("document.getElementById('events').textContent.includes('example.test/password')"))
+            js("document.getElementById('copyLog').click()")
+            var copied="";for(n in 0..30){inst.runOnMainSync{copied=ctx.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text.toString()};if("HTTP 403" in copied)break;Thread.sleep(100)}
+            assertTrue(copied.contains("HTTP 403"));assertFalse(copied.contains("example.test/password"))
+            js("document.getElementById('clearLog').click();document.querySelector('#body .apply').click()");until("document.getElementById('copyLog').disabled && !document.getElementById('events').textContent.includes('HTTP 403')")
+
         }}finally{inst.runOnMainSync{a.finish()}}
     }
 }

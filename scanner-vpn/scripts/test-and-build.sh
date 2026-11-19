@@ -3,9 +3,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 work=$(mktemp -d)
+device=${1:-build}
+# Temporary device fixtures live only in this disposable CI checkout, never in release sources.
+phone_generated=()
+
 account="svpn${RANDOM}test"
 export SSH_TEST_USER="$account" SSH_TEST_PASSWORD="https://fixture.invalid/u?token=$(openssl rand -hex 16)&test=1"
-cleanup(){ if [[ -n "${udpgw_pid:-}" ]]; then kill "$udpgw_pid" || true; fi; if [[ -n "${gateway_pid:-}" ]]; then kill "$gateway_pid" || true; fi; if [[ -f "$work/pid" ]]; then sudo kill "$(cat "$work/pid")" || true; fi; sudo userdel "$account" || true; sudo rm -rf "$work"; }
+cleanup(){ if ((${#phone_generated[@]})); then rm -f -- "${phone_generated[@]}"; fi; if [[ -n "${udpgw_pid:-}" ]]; then kill "$udpgw_pid" || true; fi; if [[ -n "${gateway_pid:-}" ]]; then kill "$gateway_pid" || true; fi; if [[ -f "$work/pid" ]]; then sudo kill "$(cat "$work/pid")" || true; fi; sudo userdel "$account" || true; sudo rm -rf "$work"; }
 trap cleanup EXIT
 sudo useradd -M -s /usr/sbin/nologin "$account"
 printf '%s:%s\n' "$account" "$SSH_TEST_PASSWORD" | sudo chpasswd
@@ -32,16 +36,42 @@ sudo /usr/sbin/sshd -f "$work/sshd_config"
 python3 -m venv "$work/wsenv"
 "$work/wsenv/bin/pip" -q install websockets==14.2
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/key.pem" -out "$work/cert.pem" -days 1 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' 2>/dev/null
+if [[ $device != --device ]]; then
 mkdir "$work/badvpn"
 curl -fsSL --retry 3 https://codeload.github.com/ambrop72/badvpn/tar.gz/07268f02706e78e282e19641b5d1d41e8e89bf31 | tar xz --strip-components=1 -C "$work/badvpn"
 cmake -S "$work/badvpn" -B "$work/udpbuild" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1
 cmake --build "$work/udpbuild" --target badvpn-udpgw --parallel 2
 "$work/udpbuild/udpgw/badvpn-udpgw" --listen-addr 127.0.0.1:22266 & udpgw_pid=$!
+fi
 export XRAY_TEST_DIR="$work"
 export GATEWAY_TEST_CERT="$work/cert.pem"
 "$work/wsenv/bin/python" scripts/test-gateway.py "$work" & gateway_pid=$!
 for i in {1..30}; do [[ -f "$work/ready" ]] && break; sleep .2; done
 test -f "$work/ready"
+if [[ $device == --device ]]; then
+  assets=app/src/androidTest/assets
+  dbg=app/src/debug
+  mkdir -p "$assets" "$dbg/res/raw" "$dbg/res/xml"
+  candidates=("$assets/ci_gateway.json" "$dbg/AndroidManifest.xml" "$dbg/res/raw/ci_gateway_ca.pem" "$dbg/res/xml/ci_gateway_trust.xml")
+  for f in "${candidates[@]}"; do [[ ! -e "$f" ]] || { echo "Refusing to overwrite $f"; exit 1; }; done
+  phone_generated=("${candidates[@]}")
+  cp "$work/cert.pem" "$dbg/res/raw/ci_gateway_ca.pem"
+  echo '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:networkSecurityConfig="@xml/ci_gateway_trust"/></manifest>' > "$dbg/AndroidManifest.xml"
+  echo '<network-security-config><domain-config><domain>localhost</domain><trust-anchors><certificates src="@raw/ci_gateway_ca"/></trust-anchors></domain-config></network-security-config>' > "$dbg/res/xml/ci_gateway_trust.xml"
+  python3 - <<'PYFIX'
+import json,os,pathlib
+pathlib.Path('app/src/androidTest/assets/ci_gateway.json').write_text(json.dumps({k:os.environ[v] for k,v in [('user','SSH_TEST_USER'),('secret','SSH_TEST_PASSWORD'),('hostKey','SSH_TEST_KEY')]}))
+PYFIX
+  adb reverse tcp:22267 tcp:22267
+  ./gradlew :app:connectedDebugAndroidTest --no-daemon --console=plain
+  python3 - <<'PYCHECK'
+import glob,xml.etree.ElementTree as ET
+cases=[t for f in glob.glob('app/build/outputs/androidTest-results/**/*.xml',recursive=True) for t in ET.parse(f).iter('testcase')]
+for name in ('rejectedRouteThenAuthenticatedForward','pasteConfigureAndObserveGatewayRefusal'):
+    assert any(t.get('name')==name and all(t.find(tag) is None for tag in ['failure','error','skipped']) for t in cases), name+' did not pass'
+PYCHECK
+  exit 0
+fi
 if ! ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon --console=plain 2>&1 | tee "$work/build.log"; then
   grep -E '(Could not (GET|HEAD|download|resolve)|status code|timed out|Temporary failure)' "$work/build.log" | head -8 | while IFS= read -r line; do echo "::error::$line"; done || true
   # Surface only build/test diagnostics (never environment variables or passwords).
