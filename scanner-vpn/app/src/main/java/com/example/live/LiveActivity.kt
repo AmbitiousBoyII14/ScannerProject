@@ -31,11 +31,11 @@ class LiveActivity:Activity(){
             try {
                 val text=contentResolver.openInputStream(uri)!!.use { stream ->
                     val out=java.io.ByteArrayOutputStream();val buf=ByteArray(4096)
-                    while(true){val n=stream.read(buf);if(n<0)break;require(out.size()+n<=65536);out.write(buf,0,n)}
+                    while(true){val n=stream.read(buf);if(n<0)break;require(out.size()+n<=(if(config)65536 else WebsiteInput.maxBytes));out.write(buf,0,n)}
                     out.toString("UTF-8").removePrefix("\uFEFF")
                 }
                 runOnUiThread{if(!isDestroyed)web.evaluateJavascript((if(config)"receiveConfig(" else "receiveBatch(")+org.json.JSONObject.quote(text)+")",null)}
-            } catch(e:Exception){runOnUiThread{Toast.makeText(this,"Could not import. Use a UTF-8 text file under 64 KiB.",Toast.LENGTH_LONG).show()}}
+            } catch(e:Exception){runOnUiThread{Toast.makeText(this,if(config)"Use a UTF-8 config under 64 KiB." else "Use a UTF-8 domain list up to 1 MiB.",Toast.LENGTH_LONG).show()}}
         }.start()
     }
     override fun onStart(){super.onStart();FloatingShortcut.screen(this,true)}
@@ -98,6 +98,9 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun save(raw:String):Boolean=runCatching{LiveState.save(Profile.read(raw));true}.getOrDefault(false)
         @JavascriptInterface fun choose(key:String)=LiveState.select(key)
         @JavascriptInterface fun checks(all:Boolean)=LiveState.check(applicationContext,all)
+        @JavascriptInterface fun checkWebsites(text:String,template:String)=LiveState.websites(applicationContext,text,template)
+        @JavascriptInterface fun hasReport()=java.io.File(filesDir,"output.txt").isFile
+        @JavascriptInterface fun exportReport(){if(!hasReport())return;runOnUiThread{try{startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("text/plain").putExtra(Intent.EXTRA_TITLE,"output.txt"),49)}catch(_:Exception){toast("No document picker available")}}}
         @JavascriptInterface fun checkList(text:String,mode:String)=LiveState.check(applicationContext,true,text,mode)
         @JavascriptInterface fun floatingEnabled()=FloatingShortcut.enabled(this@LiveActivity)
         @JavascriptInterface fun setFloating(on:Boolean){runOnUiThread{setShortcut(on)}}
@@ -125,6 +128,6 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun disconnect(){runOnUiThread{if(LiveState.status in listOf("Starting","Connected"))startService(Intent(this@LiveActivity,TunnelService::class.java).setAction("stop"))}}
     }
     private fun startTunnel(){if(!LiveState.editable()||LiveState.active()==null)return;LiveState.status="Starting";LiveState.log("START",LiveState.active()!!.label);try{val i=Intent(this,TunnelService::class.java).setAction("connect");if(Build.VERSION.SDK_INT>=26)startForegroundService(i) else startService(i)}catch(e:Exception){LiveState.status="Failed";LiveState.log("ERROR","Android blocked VPN startup")}}
-    override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==47&&result==RESULT_OK)data?.data?.let{importDocument(it,true)};if(request==48){val text=pendingExport;pendingExport=null;val uri=data?.data;if(result==RESULT_OK&&uri!=null&&text!=null)Thread{val ok=runCatching{requireNotNull(contentResolver.openOutputStream(uri,"wt")).bufferedWriter().use{it.write(text)}}.isSuccess;runOnUiThread{toast(if(ok)"File saved" else "Could not write file")}}.start()};if(request==45){val ok=android.provider.Settings.canDrawOverlays(this);setShortcut(ok);if(!ok)Toast.makeText(this,"Floating icon is off. Background VPN does not need this permission.",Toast.LENGTH_LONG).show()};if(request==44&&result==RESULT_OK)data?.data?.let{uri->try{require(uri.authority=="com.android.externalstorage.documents");contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);DebugFile.configure(uri)}catch(e:Exception){Toast.makeText(this,"Choose a folder on local device storage.",Toast.LENGTH_LONG).show()}};if(request==43 && result==RESULT_OK)data?.data?.let(::importDocument);if(request==42){if(result==RESULT_OK)startTunnel() else LiveState.log("STOP","VPN permission not granted")}}
+    override fun onActivityResult(request:Int,result:Int,data:Intent?){super.onActivityResult(request,result,data);if(request==49&&result==RESULT_OK)data?.data?.let{uri->Thread{val ok=runCatching{java.io.File(filesDir,"output.txt").inputStream().use{src->requireNotNull(contentResolver.openOutputStream(uri,"wt")).use{src.copyTo(it)}}}.isSuccess;runOnUiThread{toast(if(ok)"Report exported" else "Could not export report")}}.start()};if(request==47&&result==RESULT_OK)data?.data?.let{importDocument(it,true)};if(request==48){val text=pendingExport;pendingExport=null;val uri=data?.data;if(result==RESULT_OK&&uri!=null&&text!=null)Thread{val ok=runCatching{requireNotNull(contentResolver.openOutputStream(uri,"wt")).bufferedWriter().use{it.write(text)}}.isSuccess;runOnUiThread{toast(if(ok)"File saved" else "Could not write file")}}.start()};if(request==45){val ok=android.provider.Settings.canDrawOverlays(this);setShortcut(ok);if(!ok)Toast.makeText(this,"Floating icon is off. Background VPN does not need this permission.",Toast.LENGTH_LONG).show()};if(request==44&&result==RESULT_OK)data?.data?.let{uri->try{require(uri.authority=="com.android.externalstorage.documents");contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION);DebugFile.configure(uri)}catch(e:Exception){Toast.makeText(this,"Choose a folder on local device storage.",Toast.LENGTH_LONG).show()}};if(request==43 && result==RESULT_OK)data?.data?.let(::importDocument);if(request==42){if(result==RESULT_OK)startTunnel() else LiveState.log("STOP","VPN permission not granted")}}
     override fun onDestroy(){web.removeJavascriptInterface("Client");web.destroy();super.onDestroy()}
 }

@@ -80,3 +80,9 @@ For the full test suite, use the [build workflow](../.github/workflows/scanner-v
 - Enhanced, SlowDns, Psiphon and arbitrary multi-request payloads are not implemented. The SSH payload editor supports a single HTTP upgrade request; binary mode generates a fresh WebSocket key for each connection.
 
 [Project license](LICENSE) · [Dependency notices](app/src/main/assets/licenses/) · [AndroidLibXrayLite v26.11.9](https://github.com/2dust/AndroidLibXrayLite/tree/v26.11.9) · [Earlier version-by-version notes](https://github.com/AmbitiousBoyII14/ScannerProject/blob/a0434bdeeede0149dc0fe9a1673a4d238d2ed74e/scanner-vpn/README.md)
+
+### 1.16 · Batch website status
+
+In **Batch → Website status**, import UTF-8 text with one bare domain per line (up to 1 MiB; no 100-domain cap). Blank lines and duplicates are ignored; invalid lines are counted separately. `https://$$/` checks `/` at each listed domain, or set a fixed path like `/health`. Checks run sequentially using the configured timeout/retry policy. Each uses normal certificate verification, the same hostname for DNS/TLS/HTTP, and no VPN credentials, alternate port, cookies or redirects. **Saved VPN profiles** remains a separate mode.
+
+Connected means an HTTP response arrived, including 404; failed means no valid response. CDN labels describe the resolved IP against the bundled ranges, not the origin. ETA is estimated from completed checks. The live board shows the newest 20 rows per group. Completion or Stop saves all finished rows to app-private `output.txt`; **Export output.txt** copies the latest report to a location you choose. Starting a new run keeps the previous file until the replacement is ready.

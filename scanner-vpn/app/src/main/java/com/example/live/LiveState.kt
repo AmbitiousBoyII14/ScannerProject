@@ -31,7 +31,17 @@ internal object LiveState {
     @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=500)list.removeFirst();list.addLast("$stamp  $tag  $text");DebugFile.event("${if(batch) "BATCH" else "VPN"}  $tag  $text")}
     @Synchronized fun sessionLogText()=logs.joinToString("\n")
     @Synchronized fun clearSessionLog(){logs.clear()}
-    @Synchronized fun snapshot()=obj("debugFile" to DebugFile.status,"state" to status,"activeDns" to (active()?.dns?:""),"activeSni" to (active()?.sni?:""),"activeDns2" to (active()?.dns2?:""),"activeUdp" to (active()?.udpGw?:""),"activePayload" to (active()?.payload?:""),"activePath" to (active()?.path?:"/"),"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"results" to arr(*outcomes.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
+    @Synchronized fun snapshot()=obj("webBatch" to webBatch?.snapshot(),"debugFile" to DebugFile.status,"state" to status,"activeDns" to (active()?.dns?:""),"activeSni" to (active()?.sni?:""),"activeDns2" to (active()?.dns2?:""),"activeUdp" to (active()?.udpGw?:""),"activePayload" to (active()?.payload?:""),"activePath" to (active()?.path?:"/"),"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"results" to arr(*outcomes.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
+    private var webBatch:WebsiteBatch?=null
+    @Synchronized fun websites(context:Context,text:String,template:String):String {
+        if(!editable())return "Stop the current tunnel or batch first."
+        val path=runCatching{WebsiteInput.path(template.trim())}.getOrElse{return "Use https://\$\$/ followed by an optional path (no port, credentials, query or fragment)."}
+        val input=runCatching{WebsiteInput.hosts(text)}.getOrElse{return "Use a UTF-8 list up to 1 MiB."}
+        if(input.hosts.isEmpty())return "No valid domain lines found. Enter one domain per line without a URL or port."
+        val batch=WebsiteBatch(input.hosts,path,input.skipped);webBatch=batch;stopBatch=false;batchRunning=true
+        checks.clear();outcomes.clear();total=0;completed=0;val policy=CheckPolicy.read(context)
+        executor.execute{try{batch.run(context.filesDir,policy){stopBatch}}finally{batchRunning=false}};return ""
+    }
     fun resolve(p:Profile,ms:Int):String {val addr=NetworkChecks.resolve(p.host,ms);val ip=addr.hostAddress!!;log("DNS","${p.host} → $ip");log("CDN","$ip · ${CdnRanges.label(addr)}");return ip}
     private data class Job(val host:String,val port:Int,val profile:Profile?){val endpoint get()="$host:$port"}
     @Synchronized fun check(context:Context,all:Boolean,text:String?=null,mode:String?=null):Boolean {
@@ -43,7 +53,7 @@ internal object LiveState {
             }.distinct()
         } else (if(all)profiles.values.toList() else listOfNotNull(active())).map{Job(it.host,it.port,it)}
         if(jobs.isEmpty())return false
-        val policy=CheckPolicy.read(context);total=jobs.size;completed=0;outcomes.clear();checks.clear();stopBatch=false;batchRunning=true
+        webBatch=null;val policy=CheckPolicy.read(context);total=jobs.size;completed=0;outcomes.clear();checks.clear();stopBatch=false;batchRunning=true
         executor.execute {try{for(job in jobs){if(stopBatch)break
             val p=job.profile;log("START","${job.endpoint} · ${p?.mode?:"TLS reachability"}",true)
             var network="DNS unresolved"
