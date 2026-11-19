@@ -10,8 +10,8 @@ android {
     applicationId = "com.scannervpn.android"
     minSdk = 24
     targetSdk = 36
-    versionCode = 3
-    versionName = "1.2"
+    versionCode = 4
+    versionName = "1.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -45,6 +45,7 @@ android {
 }
 
 dependencies {
+  implementation("com.github.mwiede:jsch:2.28.8")
   implementation(files("libs/libv2ray.aar"))
   testImplementation(libs.junit)
   testImplementation("org.json:json:20240303")

@@ -17,8 +17,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - run: scanner-vpn/scripts/fetch-core.sh
-      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
-        working-directory: scanner-vpn
+      - run: scanner-vpn/scripts/test-and-build.sh
       - name: Package standalone APKs by CPU
         run: |
           mkdir apks

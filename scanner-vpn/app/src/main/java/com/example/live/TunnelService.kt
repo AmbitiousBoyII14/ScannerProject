@@ -16,16 +16,17 @@ class TunnelService:VpnService(){
     private val worker=ScheduledThreadPoolExecutor(1)
     @Volatile private var stopping=false
     private var core:CoreController?=null
+    private var ssh:SshTransport?=null
     private var tun:ParcelFileDescriptor?=null
     private var lastSample=0L
     private var lastHealth=0L
-    private fun cleanup(){runCatching{core?.stopLoop()};core=null;runCatching{tun?.close()};tun=null;LiveState.up=0.0;LiveState.down=0.0;LiveState.since=0;LiveState.ms=-1}
+    private fun cleanup(){runCatching{core?.stopLoop()};core=null;runCatching{ssh?.close()};ssh=null;runCatching{tun?.close()};tun=null;LiveState.up=0.0;LiveState.down=0.0;LiveState.since=0;LiveState.ms=-1}
     private fun notice(msg:String):Notification {val nm=getSystemService(NotificationManager::class.java);val b=if(Build.VERSION.SDK_INT>=26){nm.createNotificationChannel(NotificationChannel("live","VPN connection",NotificationManager.IMPORTANCE_LOW));Notification.Builder(this,"live")}else Notification.Builder(this);val flags=PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT;return b.setSmallIcon(android.R.drawable.ic_lock_lock).setContentTitle("Scanner VPN").setContentText(msg).setOngoing(true).setContentIntent(PendingIntent.getActivity(this,0,Intent(this,LiveActivity::class.java),flags)).addAction(android.R.drawable.ic_delete,"Disconnect",PendingIntent.getService(this,1,Intent(this,TunnelService::class.java).setAction("stop"),flags)).build()}
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(intent?.action=="stop"){stopTunnel();return START_NOT_STICKY};if(intent?.action!="connect"||LiveState.status!="Starting"){if(core==null)stopSelf();return START_NOT_STICKY}
         startForeground(73,notice("Starting tunnel…"));val p=LiveState.active()?:run{stopTunnel();return START_NOT_STICKY}
         worker.execute{try{
-            Engine.init(this);val cfg=p.config(LiveState.resolve(p));if(stopping)return@execute
+            Engine.init(this);val ip=LiveState.resolve(p);ssh=p.openSsh(ip);if(ssh!=null)LiveState.log("SSH","Host key verified; password authentication succeeded");val cfg=p.config(ip,ssh);if(stopping)return@execute
             tun=Builder().setSession("Scanner VPN").setMtu(1500).addAddress("10.77.0.2",30).addRoute("0.0.0.0",0).addDnsServer("1.1.1.1").addDisallowedApplication(packageName).establish()?:error("Permission revoked")
             val engine=Libv2ray.newCoreController(object:CoreCallbackHandler{override fun startup()=0L;override fun shutdown()=0L;override fun onEmitStatus(code:Long,msg:String?)=0L});core=engine
             engine.startLoop(cfg,tun!!.fd);LiveState.log("TUN","Android interface active; verifying HTTPS through ${p.host}:${p.port}");if(stopping)return@execute

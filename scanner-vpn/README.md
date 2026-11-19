@@ -16,3 +16,9 @@ Native dependency: [AndroidLibXrayLite v26.11.9](https://github.com/2dust/Androi
 - Scanner accepts pasted hostnames or a UTF-8 `.txt` document (up to 64 KiB) via Android's document picker. Unknown hosts must be configured first. A deduplicated list runs only matching saved profiles, using each profile's own credentials.
 - Also supports VMess over WebSocket/TLS and authenticated SOCKS5 / HTTP CONNECT over TLS. The server must accept the selected TLS transport; HTTP CONNECT only carries TCP. SSH and PHP relay cards are unavailable, not simulated.
 - CI ships individual standalone APKs per ABI. Most current Android phones use **arm64-v8a**. The app no longer packages the archived Compose preview (`legacy/`), and each APK contains only one compressed copy of the native engine. Compressed native libraries may use additional space after installation.
+
+### 1.3: direct SSH
+
+Choose **SSH** first, enter your server, username, exact password and its trusted OpenSSH public **host** key (`type base64 [comment]`). Obtain the key from your server administrator. The server must allow password authentication and TCP forwarding. Passwords are opaque text, including spaces and URL punctuation; editor drafts remain masked and in memory, not on disk. VLESS/VMess still require UUIDs.
+
+The maintained [JSch](https://github.com/mwiede/jsch/tree/jsch-2.28.8) client verifies the host key before authenticating. Its session carries TCP via direct-tcpip channels. Xray uses a per-session authenticated loopback adapter; Android resolver DNS uses TCP through the same SSH session. Generic UDP and SSH-over-WebSocket/TLS are not implemented. See `scripts/test-and-build.sh` for the isolated OpenSSH forwarding test used before publishing.
