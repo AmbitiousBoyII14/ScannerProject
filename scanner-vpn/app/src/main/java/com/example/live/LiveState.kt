@@ -27,15 +27,15 @@ internal object LiveState {
     @Synchronized fun active()=profiles[chosen]
     fun editable()=status in setOf("Idle","Failed")&&!batchRunning
     @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=100)list.removeFirst();list.addLast("$stamp  $tag  $text");DebugFile.event("${if(batch) "BATCH" else "VPN"}  $tag  $text")}
-    @Synchronized fun snapshot()=obj("debugFile" to DebugFile.status,"state" to status,"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
+    @Synchronized fun snapshot()=obj("debugFile" to DebugFile.status,"state" to status,"activeDns" to (active()?.dns?:""),"activePath" to (active()?.path?:"/"),"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
     fun resolve(p:Profile,batch:Boolean=false):String {val ip=InetAddress.getAllByName(p.host).first().hostAddress!!;log("DNS","${p.host} → $ip",batch);return ip}
-    @Synchronized fun check(context:Context,all:Boolean,text:String?=null):Boolean {
+    @Synchronized fun check(context:Context,all:Boolean,text:String?=null,mode:String?=null):Boolean {
         if(!editable()||profiles.isEmpty())return false
         val items=if(text!=null){
             if(text.length>65536)return false
             val hosts=text.lowercase().split(Regex("[\\s,;]+" )).map{it.trimEnd('.')}.filter{it.isNotEmpty()}.distinct()
-            if(hosts.isEmpty()||hosts.size>100||hosts.any{h->profiles.values.none{it.host==h}})return false
-            hosts.flatMap{h->profiles.values.filter{it.host==h}}
+            val eligible=profiles.values.filter{it.mode==mode}; if(hosts.isEmpty()||hosts.size>100||hosts.any{h->eligible.none{it.host==h}})return false
+            hosts.flatMap{h->eligible.filter{it.host==h}}
         }else if(all)profiles.values.toList() else listOfNotNull(active())
         total=items.size;completed=0
         stopBatch=false;batchRunning=true;checks.clear();executor.execute {try{Engine.init(context);for(p in items){if(stopBatch)break;log("START",p.label,true);try{val ip=resolve(p,true);if(stopBatch)break;val delay=p.openSsh(ip){t,m->log(t,m,true)}.use{ssh->ssh?.report{tag,msg->log(tag,msg,true)};Libv2ray.measureOutboundDelay(p.config(ip,ssh),CHECK_URL).also{check(it>=0)}};if(!stopBatch)log("VERIFIED","${p.host}:${p.port} · HTTPS via profile · $delay ms",true)}catch(e:Exception){if(!stopBatch)log("FAILED","${p.host}:${p.port} · "+failureReason(e,"HTTPS through the selected profile was not verified."),true)};if(!stopBatch)synchronized(this){completed++}}}finally{if(stopBatch)log("STOP","Checks cancelled",true);batchRunning=false}};return true}

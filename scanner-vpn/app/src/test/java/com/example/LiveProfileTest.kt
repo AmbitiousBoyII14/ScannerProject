@@ -5,6 +5,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LiveProfileTest {
+    @Test fun exportVlessOutboundsForLoopbackTest(){
+        val dir=System.getenv("XRAY_TEST_DIR");org.junit.Assume.assumeNotNull(dir)
+        for((i,mode) in listOf("VLESS TLS","VLESS WS TLS").withIndex()){
+            val raw=obj("mode" to mode,"host" to "localhost","port" to (22262+i),"secret" to "00000000-0000-4000-8000-000000000001","path" to "/fixture").toString()
+            val cfg=JSONObject(Profile.read(raw).config("127.0.0.1"));java.io.File(dir,"client$i.json").writeText(cfg.toString())
+        }
+    }
     @Test fun nativeProfilesProduceExpectedSecureOutbound(){
         val modes=mapOf("VLESS TLS" to "vless","VLESS WS TLS" to "vless","VMess WS TLS" to "vmess","Trojan TLS" to "trojan","Shadowsocks" to "shadowsocks","SOCKS5 TLS" to "socks","HTTP CONNECT TLS" to "http")
         modes.forEach{(mode,protocol)->

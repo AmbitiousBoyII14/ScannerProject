@@ -14,7 +14,7 @@ internal object Engine {
     private var ready=false
     @Synchronized fun init(context:Context){if(!ready){Seq.setContext(context.applicationContext);Libv2ray.initCoreEnv(context.filesDir.absolutePath, "");ready=true}}
 }
-internal class Profile(val mode:String,val host:String,val port:Int,private val secret:String,private val path:String,private val user:String, private val hostKey:String,val dns:String){
+internal class Profile(val mode:String,val host:String,val port:Int,private val secret:String,val path:String,private val user:String, private val hostKey:String,val dns:String){
     companion object {
         fun read(raw:String,forDiscovery:Boolean=false):Profile {require(raw.length<=32768);val j=JSONObject(raw);val m=j.getString("mode");val h=j.getString("host").trim().lowercase();val p=j.getInt("port");val u=j.optString("user","");val key=j.optString("hostKey","");val s=j.getString("secret");val w=j.optString("path","/");require(m in listOf("VLESS TLS","VLESS WS TLS","SSH","SSH TLS","SSH WS","SSH WS TLS","Trojan TLS","Shadowsocks","VMess WS TLS","SOCKS5 TLS","HTTP CONNECT TLS"));require(h.length in 1..253 && h.split('.').all {it.matches(Regex("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"))});require(p in 1..65535 && s.isNotEmpty() && s.length<=8192);if(m.startsWith("SSH") && !(key.isEmpty() && forDiscovery))require(key.length<=4096 && key.trim().matches(Regex("(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)) +[A-Za-z0-9+/=]+( +[^\\r\\n]*)?")));if(m.startsWith("SSH")||m in listOf("SOCKS5 TLS","HTTP CONNECT TLS"))require(u.isNotBlank() && u.length<=128);if(m.startsWith("VLESS")||m.startsWith("VMess"))require(UUID.fromString(s).toString().equals(s,true));if("WS" in m)require(w.startsWith('/') && w.length<=512 && w.none {it.isISOControl()});require(w.none{it=='#'||it.isWhitespace()}); val dns=j.optString("dns","1.1.1.1");require(dns.split('.').let{it.size==4&&it.all{o->o.matches(Regex("[0-9]{1,3}"))&&o.toInt()<=255}});return Profile(m,h,p,s,w,u,key,dns)}
     }
@@ -22,7 +22,12 @@ internal class Profile(val mode:String,val host:String,val port:Int,private val 
     val isSsh get()=mode.startsWith("SSH")
     fun gateway(log:(String,String)->Unit)=if(isSsh&&mode!="SSH")SshGateway(host,path,mode.endsWith("TLS"),"WS" in mode,log) else null
     fun openSsh(ip:String,log:(String,String)->Unit={_,_->}):SshTransport? {
-        if(!isSsh){log("OUTBOUND","$mode · $host:$port · using Xray");return null}
+        if(!isSsh){
+            log("OUTBOUND","${mode.substringBefore(' ')} · $host:$port · using Xray")
+            log("CONFIG",if(" WS" in mode) "WebSocket transport selected" else "TCP transport selected")
+            if(mode.endsWith("TLS"))log("CONFIG","TLS peer verification enabled for $host")
+            return null
+        }
         log("SSH","Opening $mode session to $host:$port; verifying pinned host key")
         return SshTransport.open(ip,port,user,secret,hostKey,gateway(log))
     }

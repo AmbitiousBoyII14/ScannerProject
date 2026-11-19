@@ -18,7 +18,7 @@ internal object DebugFile {
     private var target:Uri?=null // accessed on io only
     private fun prefs(c:Context)=c.getSharedPreferences("debug_storage",Context.MODE_PRIVATE)
     fun init(c:Context):Boolean {
-        app=c.applicationContext;val saved=prefs(c).getString("tree",null)?:return false
+        app=c.applicationContext;if(prefs(c).getBoolean("disabled",false)){status="File logging off";return true};val saved=prefs(c).getString("tree",null)?:return false
         val uri=Uri.parse(saved);if(c.contentResolver.persistedUriPermissions.none{it.uri==uri&&it.isWritePermission&&it.isReadPermission})return false
         configure(uri);return true
     }
@@ -34,9 +34,14 @@ internal object DebugFile {
             val parent=Docs.buildDocumentUriUsingTree(tree,id)
             val folder=if(id.substringAfter(':').substringAfterLast('/')=="Scanner")parent else child(parent,"Scanner",Docs.Document.MIME_TYPE_DIR)
             val file=child(folder,"debug.txt","text/plain");val before=prefs(ctx).getString("tree",null);target=file;append(ctx,file,"LOG  File logging enabled")
-            prefs(ctx).edit().putString("tree",tree.toString()).apply();status="Saving · "+Docs.getDocumentId(file).substringAfter(':');
+            prefs(ctx).edit().putBoolean("disabled",false).putString("tree",tree.toString()).apply();status="Saving · "+Docs.getDocumentId(file).substringAfter(':');
             if(before!=null&&before!=tree.toString())runCatching{r.releasePersistableUriPermission(Uri.parse(before),Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)}
         }catch(e:Exception){target=null;status="Not saving · choose a writable folder on this device";prefs(ctx).edit().remove("tree").apply()}
+    }}
+    fun disable(){val c=app?:return;io.execute{
+        target=null;val old=prefs(c).getString("tree",null)
+        prefs(c).edit().remove("tree").putBoolean("disabled",true).apply();status="File logging off"
+        if(old!=null)runCatching{c.contentResolver.releasePersistableUriPermission(Uri.parse(old),Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)}
     }}
     private fun append(c:Context,file:Uri,line:String){val date=SimpleDateFormat("yyyy-MM-dd HH:mm:ss",Locale.US).format(Date());requireNotNull(c.contentResolver.openOutputStream(file,"wa")).use{it.write("$date  $line\n".toByteArray(Charsets.UTF_8))}}
     fun event(line:String){val ctx=app?:return;io.execute{val dest=target?:return@execute;try{append(ctx,dest,line)}catch(e:Exception){target=null;status="Write failed · reselect folder or check free space";prefs(ctx).edit().remove("tree").apply()}}}

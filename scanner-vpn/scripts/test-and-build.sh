@@ -32,6 +32,7 @@ sudo /usr/sbin/sshd -f "$work/sshd_config"
 python3 -m venv "$work/wsenv"
 "$work/wsenv/bin/pip" -q install websockets==14.2
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/key.pem" -out "$work/cert.pem" -days 1 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' 2>/dev/null
+export XRAY_TEST_DIR="$work"
 export GATEWAY_TEST_CERT="$work/cert.pem"
 "$work/wsenv/bin/python" scripts/test-gateway.py "$work" & gateway_pid=$!
 for i in {1..30}; do [[ -f "$work/ready" ]] && break; sleep .2; done
@@ -47,3 +48,9 @@ for name in glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml'):
 PYTEST
   exit 1
 fi
+
+# Same upstream revision as the Android engine; only run against local fixtures.
+curl -fsSL --retry 3 https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-linux-64.zip -o "$work/xray.zip"
+echo "b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82  $work/xray.zip" | sha256sum -c -
+unzip -q "$work/xray.zip" xray -d "$work"; chmod +x "$work/xray"
+python3 scripts/test-vless.py "$work"

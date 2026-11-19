@@ -68,13 +68,14 @@ class LiveActivity:Activity(){
         }catch(e:Exception){enrollmentResult("Check the account format, server, port and username. Stop active sessions before saving.",false)}
     }
     inner class Bridge{
+        @JavascriptInterface fun stopFile(){DebugFile.disable()}
         @JavascriptInterface fun chooseFolder(){runOnUiThread{askForFolder()}}
         @JavascriptInterface fun enrollSsh(raw:String){runOnUiThread{enroll(raw)}}
         @JavascriptInterface fun snapshot()=LiveState.snapshot()
         @JavascriptInterface fun save(raw:String):Boolean=runCatching{LiveState.save(Profile.read(raw));true}.getOrDefault(false)
         @JavascriptInterface fun choose(key:String)=LiveState.select(key)
         @JavascriptInterface fun checks(all:Boolean)=LiveState.check(applicationContext,all)
-        @JavascriptInterface fun checkList(text:String)=LiveState.check(applicationContext,true,text)
+        @JavascriptInterface fun checkList(text:String,mode:String)=LiveState.check(applicationContext,true,text,mode)
         @JavascriptInterface fun preferences()=org.json.JSONObject().apply {prefKeys.forEach{put(it,prefs.getBoolean(it,defaultValue(it)))}}.toString()
         @JavascriptInterface fun preference(key:String,value:Boolean){if(key in prefKeys){prefs.edit().putBoolean(key,value).apply();runOnUiThread{applySettings()}}}
         @JavascriptInterface fun importBatch(){runOnUiThread{try{startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("text/*"),43)}catch(e:android.content.ActivityNotFoundException){Toast.makeText(this@LiveActivity,"No document picker installed",Toast.LENGTH_SHORT).show()}}}
