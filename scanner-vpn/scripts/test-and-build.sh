@@ -67,7 +67,7 @@ if [[ $device == --device ]]; then
   echo '<network-security-config><domain-config><domain>localhost</domain><trust-anchors><certificates src="@raw/ci_gateway_ca"/></trust-anchors></domain-config></network-security-config>' > "$dbg/res/xml/ci_gateway_trust.xml"
   python3 - <<'PYFIX'
 import json,os,pathlib
-pathlib.Path('app/src/androidTest/assets/ci_gateway.json').write_text(json.dumps({k:os.environ[v] for k,v in [('user','SSH_TEST_USER'),('secret','SSH_TEST_PASSWORD'),('hostKey','SSH_TEST_KEY')]}))
+pathlib.Path('app/src/androidTest/assets/ci_gateway.json').write_text(json.dumps({k:os.environ[v] for k,v in [('user','SSH_TEST_USER'),('secret','SSH_TEST_PASSWORD'),('hostKey','SSH_TEST_KEY'),('otherKey','SSH_TEST_OTHER_KEY')]}))
 PYFIX
   echo '<resources><string name="vpn_health_url" translatable="false">http://127.0.0.1:22268/proof</string></resources>' > "$dbg/res/values/ci_health.xml"
   # Shell UID probe with bounded runtime; close stdin without blocking instrumentation's stdout reader.

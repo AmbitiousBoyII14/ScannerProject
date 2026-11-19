@@ -38,9 +38,26 @@ class WssConnectionTest {
         ctx.getSharedPreferences("debug_storage",0).edit().putBoolean("disabled",true).commit()
         val activity=inst.startActivitySync(Intent(ctx,LiveActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as LiveActivity
         try{
-            assertNull("Emulator VPN consent",VpnService.prepare(activity));LiveState.save(p);activity.Bridge().connect()
+            assertNull("Emulator VPN consent",VpnService.prepare(activity));LiveState.save(p)
+            val id="${p.host}:${p.port}";val pins=ctx.getSharedPreferences("known_ssh_servers",0);HostPins.forget(ctx,id)
+            fun tapTrust(title:String,button:String){
+                repeat(150){
+                    val root=inst.uiAutomation.rootInActiveWindow
+                    if(root?.findAccessibilityNodeInfosByText(title)?.isNotEmpty()==true){
+                        val node=root.findAccessibilityNodeInfosByText(button).firstOrNull{it.isClickable}
+                        if(node?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true)return
+                    };Thread.sleep(100)
+                };fail("No SSH trust dialog: $title; "+LiveState.sessionLogText().takeLast(420))
+            }
+            activity.Bridge().connect();tapTrust("Trust SSH host", "Cancel")
+            for(n in 0..100){if(LiveState.status=="Failed")break;Thread.sleep(100)}
+            assertEquals("Failed",LiveState.status);assertFalse(pins.contains(id))
+            val legacy="${p.label} · legacy-route";pins.edit().putString(legacy,j.getString("otherKey")).commit()
+            LiveState.clearSessionLog();activity.Bridge().connect();tapTrust("Host key changed", "Accept New Key")
             for(n in 0..200){if(LiveState.status in setOf("Connected","Failed"))break;Thread.sleep(150)}
             assertEquals(LiveState.sessionLogText().takeLast(650),"Connected",LiveState.status)
+            assertEquals(k.first,pins.getString(id,null));assertFalse(pins.contains(legacy))
+            assertEquals("Trust and authenticate on one TCP connection",1,LiveState.sessionLogText().lines().count{it.contains("  TCP  Connected to")})
             assertTrue("A second UID must receive the SSH-only 204 through the Android TUN",proofFromShellUid())
         }finally{
             activity.Bridge().disconnect();for(n in 0..50){if(LiveState.status in setOf("Idle","Failed"))break;Thread.sleep(100)}

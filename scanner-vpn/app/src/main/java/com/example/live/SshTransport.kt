@@ -37,14 +37,24 @@ internal class SshTransport private constructor(private val session:Session,priv
                 return "${key.type} ${key.key}" to key.getFingerPrint(jsch)
             } finally {probe.disconnect()}
         }
-        fun open(ip:String,port:Int,user:String,password:String,hostKey:String,gateway:SshGateway?=null,udpGw:String="",event:(String,String)->Unit={_,_->}):SshTransport {
+        fun open(ip:String,port:Int,user:String,password:String,hostKey:String,gateway:SshGateway?=null,udpGw:String="",verify:((String)->Boolean)?=null,event:(String,String)->Unit={_,_->}):SshTransport {
             val ssh=JSch();val alias="scanner-profile"
-            val fields=hostKey.trim().split(Regex("\\s+"));require(fields.size>=2)
-            ssh.setKnownHosts("$alias ${fields[0]} ${fields[1]}\n".byteInputStream())
             val session=ssh.getSession(user,ip,port)
             if(gateway!=null)session.setProxy(gateway)
             session.setHostKeyAlias(alias)
-            session.setConfig("server_host_key",if(fields[0]=="ssh-rsa")"rsa-sha2-512,rsa-sha2-256" else fields[0])
+            if(verify!=null){
+                // JSch invokes check after verifying the KEX signature, before userauth on this session.
+                session.setHostKeyRepository(object:com.jcraft.jsch.HostKeyRepository by ssh.hostKeyRepository {
+                    override fun check(host:String,blob:ByteArray):Int {
+                        val key=com.jcraft.jsch.HostKey(host,blob)
+                        return if(verify("${key.type} ${key.key}")) com.jcraft.jsch.HostKeyRepository.OK else com.jcraft.jsch.HostKeyRepository.CHANGED
+                    }
+                })
+            }else{
+                val fields=hostKey.trim().split(Regex("\\s+"));require(fields.size>=2)
+                ssh.setKnownHosts("$alias ${fields[0]} ${fields[1]}\n".byteInputStream())
+                session.setConfig("server_host_key",if(fields[0]=="ssh-rsa")"rsa-sha2-512,rsa-sha2-256" else fields[0])
+            }
             session.setConfig("StrictHostKeyChecking","yes")
             session.setConfig("PreferredAuthentications","password")
             session.setConfig("MaxAuthTries","1")

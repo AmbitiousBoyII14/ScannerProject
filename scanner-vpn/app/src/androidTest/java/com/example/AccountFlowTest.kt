@@ -19,6 +19,7 @@ class AccountFlowTest {
     @Test fun pasteConfigureAndObserveGatewayRefusal(){
         val inst=InstrumentationRegistry.getInstrumentation();val ctx=inst.targetContext
         ctx.getSharedPreferences("debug_storage",0).edit().putBoolean("disabled",true).commit()
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(inst.uiAutomation.executeShellCommand("appops set ${ctx.packageName} ACTIVATE_VPN allow")).use{it.readBytes()}
         val a=inst.startActivitySync(Intent(ctx,LiveActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         fun find(v:View):WebView? {if(v is WebView)return v;if(v is ViewGroup)for(i in 0 until v.childCount)find(v.getChildAt(i))?.let{return it};return null}
         inst.uiAutomation.executeShellCommand("wm dismiss-keyguard").close()

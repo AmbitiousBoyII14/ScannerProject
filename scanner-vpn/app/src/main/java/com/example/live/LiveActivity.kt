@@ -38,39 +38,24 @@ class LiveActivity:Activity(){
             } catch(e:Exception){runOnUiThread{Toast.makeText(this,"Could not import. Use a UTF-8 text file under 64 KiB.",Toast.LENGTH_LONG).show()}}
         }.start()
     }
-    private val pins by lazy { getSharedPreferences("known_ssh_servers", MODE_PRIVATE) }
-    private var enrolling=false // Accessed only on the UI thread.
-    private fun enrollmentResult(message:String,ok:Boolean){
-        enrolling=false
-        LiveState.log(if(ok) "PROFILE" else "SSH",message)
-        if(!isFinishing&&!isDestroyed)web.evaluateJavascript("sshResult("+org.json.JSONObject.quote(message)+",$ok)",null)
-    }
+    override fun onResume(){super.onResume();HostPins.foreground=this}
+    override fun onPause(){if(HostPins.foreground===this)HostPins.foreground=null;super.onPause()}
     private fun enroll(raw:String){
-        if(enrolling)return
-        enrolling=true
-        try{
-            val profile=Profile.read(raw,forDiscovery=true);require(profile.isSsh && LiveState.editable())
-            val endpoint=if(profile.mode=="SSH")"${profile.host}:${profile.port}" else profile.label+" · "+java.security.MessageDigest.getInstance("SHA-256").digest((profile.sni+"\n"+profile.path+"\n"+profile.payload).toByteArray()).take(8).joinToString(""){"%02x".format(it)}
-            fun save(key:String){
-                try{val j=org.json.JSONObject(raw).put("hostKey",key);LiveState.save(Profile.read(j.toString()));pins.edit().putString(endpoint,key).apply();enrollmentResult("SSH profile selected.",true)}
-                catch(e:Exception){enrollmentResult("Could not save the profile. Stop active connections and check the fields.",false)}
-            }
-            val existing=pins.getString(endpoint,null)
-            if(existing!=null){save(existing);return}
-            Thread {
-                try{LiveState.log("KEY","Fetching host key via ${profile.label} before authentication");val (key,fp)=SshTransport.discover(LiveState.resolve(profile),profile.port,profile.gateway{t,m->LiveState.log(t,m)})
-                    runOnUiThread{if(!isFinishing&&!isDestroyed){
-                        android.app.AlertDialog.Builder(this).setTitle("Trust this SSH server?")
-                            .setMessage("${profile.label}\n\nKey type: ${key.substringBefore(' ')}\nFingerprint: $fp\n\nCompare this fingerprint with your provider before trusting it. No password has been sent.")
-                            .setPositiveButton("Trust & save"){_,_->save(key)}.setNegativeButton("Cancel"){_,_->enrollmentResult("Server not trusted. No profile saved.",false)}
-                            .setOnCancelListener{enrollmentResult("Server not trusted.",false)}.show()
-                    }}
-                }catch(e:Exception){runOnUiThread{enrollmentResult(failureReason(e,"No SSH identification or host key received via ${profile.mode}.")+" No password was sent.",false)}}
-            }.start()
-        }catch(e:Exception){enrollmentResult("Check the account format, server, port and username. Stop active sessions before saving.",false)}
+        val ok=runCatching {val p=Profile.read(raw,forDiscovery=true);require(p.isSsh);LiveState.save(p)}.isSuccess
+        val message=if(ok)"SSH profile selected." else "Could not select SSH profile. Check the account fields."
+        LiveState.log("PROFILE",message);web.evaluateJavascript("sshResult("+org.json.JSONObject.quote(message)+",$ok)",null)
     }
     private val remembered by lazy { RememberedSsh(applicationContext) }
     inner class Bridge{
+        @JavascriptInterface fun forgetHostKey(host:String,port:Int){runOnUiThread{
+            if(!LiveState.editable() || port !in 1..65535 || !host.matches(Regex("[a-zA-Z0-9.-]{1,253}")))return@runOnUiThread
+            val id="${host.lowercase()}:$port"
+            android.app.AlertDialog.Builder(this@LiveActivity).setTitle("Forget pinned host key?").setMessage("Only the SSH key for $id will be removed. Your login and settings will be kept.")
+                .setNegativeButton("Cancel",null).setPositiveButton("Forget key"){_,_->
+                    val ok=LiveState.editable() && HostPins.forget(this@LiveActivity,id)
+                    Toast.makeText(this@LiveActivity,if(ok)"Verify the fingerprint on your next connection." else "Could not forget key.",Toast.LENGTH_LONG).show()
+                }.show()
+        }}
         @JavascriptInterface fun rememberSsh(raw:String)=runCatching{remembered.save(raw);true}.getOrDefault(false)
         @JavascriptInterface fun rememberedSsh()=runCatching{remembered.load()}.getOrDefault("")
         @JavascriptInterface fun forgetSsh()=runCatching{remembered.forget();true}.getOrDefault(false)

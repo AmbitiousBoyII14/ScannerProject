@@ -23,7 +23,7 @@ internal class Profile(val mode:String,val host:String,val port:Int,private val 
     val label get()="$mode · $host:$port"
     val isSsh get()=mode.startsWith("SSH")
     fun gateway(log:(String,String)->Unit)=if(isSsh&&mode!="SSH")SshGateway(sni.ifBlank{host},mode.endsWith("TLS"),if(" WS" in mode||" HTTP" in mode) GatewayRequest.parse(payload,sni.ifBlank{host},port,path," WS" in mode) else null," WS" in mode,"WS+Raw" in mode,log) else null
-    fun openSsh(ip:String,log:(String,String)->Unit={_,_->}):SshTransport? {
+    fun openSsh(ip:String,verify:((String)->Boolean)?=null,log:(String,String)->Unit={_,_->}):SshTransport? {
         if(!isSsh){
             log("OUTBOUND","${mode.substringBefore(' ')} · $host:$port · using Xray")
             log("CONFIG",if(" WS" in mode) "WebSocket transport selected" else "TCP transport selected")
@@ -31,7 +31,7 @@ internal class Profile(val mode:String,val host:String,val port:Int,private val 
             return null
         }
         log("SSH","Opening $mode session to $host:$port; verifying pinned host key")
-        return SshTransport.open(ip,port,user,secret,hostKey,gateway(log),udpGw,log)
+        return SshTransport.open(ip,port,user,secret,hostKey,gateway(log),udpGw,verify,log)
     }
     fun config(address:String,ssh:SshTransport?=null):String {
         val type=if(mode.startsWith("VLESS"))"vless" else if(mode=="Trojan TLS")"trojan" else when(mode){"VMess WS TLS"->"vmess";"SOCKS5 TLS"->"socks";"HTTP CONNECT TLS"->"http";else->"shadowsocks"}

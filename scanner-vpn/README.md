@@ -1,8 +1,10 @@
 # Scanner VPN — Android source and progress
 
-**Previous release: [1.8, signed APKs](https://github.com/AmbitiousBoyII14/ScannerProject/releases/tag/scanner-vpn-signed-44535731667)** · [1.8 source as built](https://github.com/AmbitiousBoyII14/ScannerProject/tree/fba880d02ddc031cbbc8120c7052a8c6c2850e49/scanner-vpn) · [Passing build and Android tests](https://github.com/AmbitiousBoyII14/ScannerProject/actions/runs/44534968663)
+**Historical release: [1.8, signed APKs](https://github.com/AmbitiousBoyII14/ScannerProject/releases/tag/scanner-vpn-signed-44535731667)** · [1.8 source as built](https://github.com/AmbitiousBoyII14/ScannerProject/tree/fba880d02ddc031cbbc8120c7052a8c6c2850e49/scanner-vpn) · [Passing build and Android tests](https://github.com/AmbitiousBoyII14/ScannerProject/actions/runs/44534968663)
 
 This directory (`scanner-vpn/`) is the Gradle project to open. The repository-root `app/` is a different application; `web-preview/` is a simulation. The Android app here uses a bundled WebView for controls and a native `VpnService` for traffic. Package: `com.scannervpn.android`; minimum Android 7.0 (API 24).
+
+**1.10 (code 11):** SSH verifies the host key inside the same key exchange that precedes password login. On first use, compare the displayed SHA-256 fingerprint with the provider. A changed pin requires explicit approval of the old/new fingerprint dialog; Cancel, timeout, or leaving the activity fails closed. Pins are shared by normalized account hostname and port (including batch), never by resolved IP. Matching 1.9 route pins migrate; conflicting legacy keys require review. To remove just this endpoint’s trust, use **SSH settings → Reset / Forget Pinned Host Key**. Clearing app data is not necessary.
 
 **1.9 (code 10):** On the VPN screen, enable **Use Payload → Raw SSH after upgrade** to allow either framing on one connection. The client sends a fresh WebSocket handshake. A valid accept uses binary frames; HTTP/1.1 101 without an accept header selects raw SSH only with this option enabled. A present but invalid accept or any non-101 is still rejected. SSL and SSH key verification are unchanged. The log reports which transport was selected; selecting raw is not proof of SSH login.
 

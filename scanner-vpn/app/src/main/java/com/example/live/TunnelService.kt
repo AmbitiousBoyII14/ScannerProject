@@ -27,7 +27,7 @@ class TunnelService:VpnService(){
         if(intent?.action=="stop"){stopTunnel();return START_NOT_STICKY};if(intent?.action!="connect"||LiveState.status!="Starting"){if(core==null)stopSelf();return START_NOT_STICKY}
         startForeground(73,notice("Starting tunnel…"));val p=LiveState.active()?:run{stopTunnel();return START_NOT_STICKY}
         worker.execute{try{
-            Engine.init(this);val ip=LiveState.resolve(p);ssh=p.openSsh(ip){t,m->LiveState.log(t,m)};ssh?.report{tag,msg->LiveState.log(tag,msg)};val cfg=p.config(ip,ssh);if(stopping)return@execute
+            Engine.init(this);val ip=LiveState.resolve(p);ssh=p.openSsh(ip,HostPins.verifier(this,p){!stopping}){t,m->LiveState.log(t,m)};ssh?.report{tag,msg->LiveState.log(tag,msg)};val cfg=p.config(ip,ssh);if(stopping)return@execute
             LiveState.log("VPN","Installing default IPv4 route · DNS ${p.dns}");tun=Builder().setSession("Scanner VPN").setMtu(1500).addAddress("10.77.0.2",30).addRoute("0.0.0.0",0).addDnsServer(p.dns).apply{if(p.dns2.isNotEmpty()&&p.dns2!=p.dns)addDnsServer(p.dns2)}.addDisallowedApplication(packageName).establish()?:error("Permission revoked")
             val engine=Libv2ray.newCoreController(object:CoreCallbackHandler{override fun startup()=0L;override fun shutdown()=0L;override fun onEmitStatus(code:Long,msg:String?)=0L});core=engine
             engine.startLoop(cfg,tun!!.fd);LiveState.log("TUN","Android interface active; checking outbound through ${p.host}:${p.port}");if(stopping)return@execute
