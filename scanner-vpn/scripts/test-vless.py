@@ -25,6 +25,9 @@ with http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler) as dest:
     threading.Thread(target=dest.serve_forever,daemon=True).start()
     for i,transport in enumerate(['tcp','ws']):
         client=json.loads((work/f'client{i}.json').read_text());out=client['outbounds'][0];serverport=22262+i
+        # Production uses Xray's public CA bundle. Here the only private trust anchor
+        # is the generated fixture certificate; hostname verification stays enabled.
+        out['streamSettings']['tlsSettings']['certificates']=[{'usage':'verify','certificateFile':str(work/'cert.pem')}]
         assert out['protocol']=='vless' and out['streamSettings']['security']=='tls'
         stream={'network':transport,'security':'tls','tlsSettings':{'certificates':[{'certificateFile':str(work/'cert.pem'),'keyFile':str(work/'key.pem')}]}}
         if transport=='ws':stream['wsSettings']={'path':'/fixture'}
