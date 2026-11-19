@@ -30,6 +30,18 @@ class AccountFlowTest {
             val received=ArrayBlockingQueue<String>(1);server.soTimeout=60000
             thread(isDaemon=true){runCatching{server.accept().use{s->val r=s.getInputStream().bufferedReader();received.put(r.readLine());while(!r.readLine().isNullOrEmpty()){};s.getOutputStream().write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n".toByteArray())}}}
             until("typeof receiveAccount==='function'")
+            // Real clipboard → import review → native Xray JSON. Never connect to the example host.
+            val link="vless://00000000-0000-4000-8000-000000000001@192.0.2.9:443/?type=ws&host=route.example&security=tls&sni=cert.example&path=%2Ffixture&allowInsecure=1#demo"
+            inst.runOnMainSync{ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("share fixture",link))}
+            js("document.querySelectorAll('#flags input')[7].click();document.querySelector('#edit').click();document.querySelector('#body .tools button').click();document.querySelector('#body .dismiss').click()")
+            until("document.getElementById('coreShare')?.value.endsWith('#demo')===true")
+            js("document.querySelector('#body .apply').click()");until("document.querySelector('#body label').hidden===false")
+            js("document.querySelector('#body input').click();document.querySelector('#body .apply').click();document.querySelectorAll('#body .tools button')[1].click()")
+            until("document.querySelector('#body pre')!==null")
+            val config=org.json.JSONObject(org.json.JSONTokener(js("document.querySelector('#body pre').textContent")).nextValue() as String)
+            val outbound=config.getJSONArray("outbounds").getJSONObject(0);val stream=outbound.getJSONObject("streamSettings")
+            assertEquals("192.0.2.9",outbound.getJSONObject("settings").getJSONArray("vnext").getJSONObject(0).getString("address"));assertEquals("/fixture",stream.getJSONObject("wsSettings").getString("path"));assertEquals("route.example",stream.getJSONObject("wsSettings").getString("host"));assertEquals("cert.example",stream.getJSONObject("tlsSettings").getString("serverName"))
+            js("document.querySelector('#dismiss').click();document.querySelectorAll('#flags input')[7].click()")
             val account="127.0.0.1:${server.localPort}@fixture:a@:https://example.test/password"
             inst.runOnMainSync{ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("fixture",account))}
             js("document.getElementById('paste').click()");until("document.getElementById('account').value.endsWith('example.test/password')");assertEquals("\"text\"",js("document.getElementById('account').type"))
