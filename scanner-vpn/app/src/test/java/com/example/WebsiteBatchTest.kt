@@ -21,6 +21,10 @@ class WebsiteBatchTest {
             val s=run.snapshot();assertEquals(27,s.getInt("done"));assertEquals(1,s.getInt("failed"));assertEquals(20,s.getJSONArray("groups").getJSONObject(0).getJSONArray("rows").length());val text=File(dir,"output.txt").readText();assertTrue(text.contains("[HTTP 4xx · 1]\nmissing.test\tHTTP 404"));assertTrue(text.contains("[Failed · 1]\nbad.test\tDNS lookup failed."));assertTrue(text.contains("ok1.test\tHTTP 200"));assertTrue(text.contains("[Known CDN matches"));assertEquals("Complete",s.getString("state"));WebsiteBatch(hosts,"/",0).run(dir,CheckPolicy()){true};assertTrue(File(dir,"output.txt").readText().contains("Stopped"))
         }finally{dir.deleteRecursively()}
     }
+    @Test fun finalResponseAfterEarlyHints(){
+        val response="HTTP/1.1 103 Early Hints\r\nLink: </foo>\r\n\r\nHTTP/1.1 301 Moved\r\n"
+        assertEquals(301,WebsiteInput.finalStatus(response.byteInputStream(),2000))
+    }
     @Test fun directVerifiedHeadGetsReal404(){
         val pem=System.getenv("GATEWAY_TEST_CERT");org.junit.Assume.assumeNotNull(pem)
         val ks=KeyStore.getInstance(KeyStore.getDefaultType()).apply{load(null,null);File(pem).inputStream().use{setCertificateEntry("fixture",CertificateFactory.getInstance("X.509").generateCertificate(it))}}

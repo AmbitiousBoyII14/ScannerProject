@@ -60,7 +60,12 @@ class AccountFlowTest {
             assertTrue(copied.contains("HTTP 403"));assertFalse(copied.contains("example.test/password"))
             js("document.querySelector('#plugins').click();document.querySelector('#apply').click()");until("!document.getElementById('events').textContent.includes('HTTP 403')")
             js("location.reload()");until("typeof receiveAccount==='function' && document.getElementById('account').value.endsWith('example.test/password')");drawer("SSH Settings");until("document.getElementById('remember').checked");js("document.getElementById('remember').click()");until("Client.rememberedSsh()==='' ")
-
+            // No HTTPS server is bound on the emulator loopback's default port. The direct
+            // website check must report a network failure, never reuse the saved SSH login.
+            js("document.querySelector('#back').click();document.querySelector('[data-tab=batch]').click();document.querySelector('#targets').value='127.0.0.1\\ninvalid:123\\n127.0.0.1';document.querySelector('#scan').click()")
+            until("document.querySelector('#progress').textContent.includes('1/1 completed') && !document.querySelector('#report').hidden")
+            assertTrue(js("document.querySelector('#progress').textContent").contains("Skipped 1 invalid"))
+            val report=java.io.File(ctx.filesDir,"output.txt").readText();assertTrue(report.contains("[Failed · 1]"));assertFalse(report.contains("example.test/password"))
 
         }}finally{inst.runOnMainSync{a.finish()}}
     }

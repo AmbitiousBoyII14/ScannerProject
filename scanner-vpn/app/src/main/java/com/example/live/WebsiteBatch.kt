@@ -33,10 +33,26 @@ internal object WebsiteInput {
         (factory.createSocket(tcp,host,port,true) as SSLSocket).use { tls->
             tls.sslParameters=tls.sslParameters.apply{endpointIdentificationAlgorithm="HTTPS"};tls.startHandshake()
             tls.outputStream.write("HEAD $path HTTP/1.1\r\nHost: $host\r\nConnection: close\r\n\r\n".toByteArray(Charsets.US_ASCII));tls.outputStream.flush()
-            val input=tls.inputStream.buffered();val line=StringBuilder();val deadline=System.nanoTime()+ms*1_000_000L
-            while(line.length<2048 && System.nanoTime()<deadline){val c=input.read();if(c<0)break;if(c==10)return@use Regex("HTTP/1\\.[01] ([1-5][0-9]{2})(?: .*|)\r?").matchEntire(line)?.groupValues?.get(1)?.toInt()?:throw IOException("Invalid HTTP response");line.append(c.toChar())};throw IOException("Incomplete HTTP response")
+            finalStatus(tls.inputStream,ms)
         }
     }
+    // Ignore informational responses such as 103 Early Hints, but never follow redirects.
+    internal fun finalStatus(stream:InputStream,ms:Int):Int {
+        val input=stream.buffered();val deadline=System.nanoTime()+ms*1_000_000L;var remaining=32768
+        fun line():String {
+            val chars=StringBuilder()
+            while(chars.length<4096 && remaining-- > 0){
+                if(System.nanoTime()>=deadline)throw SocketTimeoutException()
+                val c=input.read();if(c<0)break;if(c==10)return chars.toString().removeSuffix("\r");chars.append(c.toChar())
+            };throw IOException("Incomplete HTTP response")
+        }
+        while(true){
+            val code=Regex("HTTP/1\\.[01] ([1-5][0-9]{2})(?: .*)?").matchEntire(line())?.groupValues?.get(1)?.toInt()?:throw IOException("Invalid HTTP response")
+            if(code>=200 || code==101)return code
+            while(line().isNotEmpty()) { /* interim headers */ }
+        }
+    }
+
 }
 
 /** Stream full result groups to disk; only a small tail per group is sent across the WebView bridge. */
