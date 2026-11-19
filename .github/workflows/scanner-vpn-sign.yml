@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Identify approved build
         id: build
         run: echo "run=$(jq -re '.run | select(test("^[0-9]+$"))' scanner-vpn/signing/approval.json)" >> "$GITHUB_OUTPUT"
@@ -35,9 +37,17 @@ jobs:
             test "$actual" = "$fingerprint" || { echo '::error::Unexpected APK signing certificate'; exit 1; }
             echo "Verified $f: $actual"
           done
+      - name: Bundle matching Android Studio project, engine sources and UI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVED_RUN: ${{ steps.build.outputs.run }}
+        run: |
+          built=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APPROVED_RUN" --jq '.head_sha')
+          git diff --exit-code "$built" HEAD -- scanner-vpn ':!scanner-vpn/signing/approval.json'
+          tools/package-vpn-1.15-source.sh
       - name: Publish verified APKs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           git archive --format=zip --output=Scanner-VPN-source.zip HEAD scanner-vpn .github/workflows/scanner-vpn-preview.yml .github/workflows/scanner-vpn-sign.yml
-          gh release create "scanner-vpn-signed-${GITHUB_RUN_ID}" apks/*.apk Scanner-VPN-source.zip --target "$GITHUB_SHA" --title 'Scanner VPN · signed Android client' --prerelease --notes 'APK v2 signature verified against the Scanner VPN update certificate. Use the same CPU variant for updates.'
+          gh release create "scanner-vpn-signed-${GITHUB_RUN_ID}" apks/*.apk Scanner-VPN-source.zip Scanner-VPN-1.15-Android-project.zip Scanner-VPN-Demo.html --target "$GITHUB_SHA" --title 'Scanner VPN 1.15 · signed Android client' --prerelease --notes 'APK v2 signature verified against the Scanner VPN update certificate. Use the same CPU variant for updates.'
