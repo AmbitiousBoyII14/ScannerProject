@@ -26,7 +26,7 @@ class TunnelService:VpnService(){
         if(intent?.action=="stop"){stopTunnel();return START_NOT_STICKY};if(intent?.action!="connect"||LiveState.status!="Starting"){if(core==null)stopSelf();return START_NOT_STICKY}
         startForeground(73,notice("Starting tunnel…"));val p=LiveState.active()?:run{stopTunnel();return START_NOT_STICKY}
         worker.execute{try{
-            Engine.init(this);val ip=LiveState.resolve(p);ssh=p.openSsh(ip);if(ssh!=null)LiveState.log("SSH","Host key verified; password authentication succeeded");val cfg=p.config(ip,ssh);if(stopping)return@execute
+            Engine.init(this);val ip=LiveState.resolve(p);ssh=p.openSsh(ip);ssh?.report{tag,msg->LiveState.log(tag,msg)};val cfg=p.config(ip,ssh);if(stopping)return@execute
             tun=Builder().setSession("Scanner VPN").setMtu(1500).addAddress("10.77.0.2",30).addRoute("0.0.0.0",0).addDnsServer("1.1.1.1").addDisallowedApplication(packageName).establish()?:error("Permission revoked")
             val engine=Libv2ray.newCoreController(object:CoreCallbackHandler{override fun startup()=0L;override fun shutdown()=0L;override fun onEmitStatus(code:Long,msg:String?)=0L});core=engine
             engine.startLoop(cfg,tun!!.fd);LiveState.log("TUN","Android interface active; verifying HTTPS through ${p.host}:${p.port}");if(stopping)return@execute

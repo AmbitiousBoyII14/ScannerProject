@@ -52,6 +52,13 @@ internal class SshTransport private constructor(private val session:Session):Clo
             catch(e:Exception){session.disconnect();throw e}
         }
     }
+    fun report(log:(String,String)->Unit){
+        log("PEER",session.serverVersion.filter {it.code in 32..126}.take(128))
+        log("KEY",session.hostKey.getFingerPrint(JSch()))
+        log("KEX",session.kexAlgorithm)
+        log("CIPHER","Upload ${session.cipherAlgorithmC2S} · download ${session.cipherAlgorithmS2C}")
+        log("AUTH","SSH password accepted; local forwarding adapter ready")
+    }
     private fun listen()=thread(isDaemon=true,name="ssh-accept") {
         while(!closed){val client=try{listener.accept()}catch(_:Exception){break}
             clients.add(client)
