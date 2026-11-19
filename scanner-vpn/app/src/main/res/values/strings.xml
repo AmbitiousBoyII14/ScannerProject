@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Scanner VPN</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_servers">Servers</string>
+    <string name="nav_configs">Configs</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    
+    <string name="status_connected">CONNECTED</string>
+    <string name="status_disconnected">DISCONNECTED</string>
+    <string name="status_connecting">CONNECTING...</string>
+    <string name="status_disconnecting">DISCONNECTING...</string>
+    <string name="status_error">TUNNEL ERROR</string>
+
+    <string name="btn_connect">TAP TO CONNECT</string>
+    <string name="btn_disconnect">DISCONNECT</string>
+    <string name="btn_connecting">ESTABLISHING TUNNEL...</string>
+</resources>

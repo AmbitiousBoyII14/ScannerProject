@@ -1,0 +1,26 @@
+name: Scanner VPN preview APK
+on:
+  push:
+    branches: ['arena/5c83bf87-scannerproject']
+    paths: ['scanner-vpn/**', '.github/workflows/scanner-vpn-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: ./gradlew :app:assembleDebug --no-daemon
+        working-directory: scanner-vpn
+      - run: cp scanner-vpn/app/build/outputs/apk/debug/app-debug.apk Scanner-VPN-preview.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Scanner-VPN-preview
+          path: Scanner-VPN-preview.apk
+          if-no-files-found: error
