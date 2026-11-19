@@ -15,7 +15,7 @@ class SshTransportTest {
         val pass=System.getenv("SSH_TEST_PASSWORD");val p=profile(key,pass)
         // Authentication and host verification fail closed; no local proxy on failure.
         assertThrows(Exception::class.java){profile(key,"not-the-password").openSsh("127.0.0.1")?.close()}
-        assertThrows(Exception::class.java){profile("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQDA",pass).openSsh("127.0.0.1")?.close()}
+        assertThrows(Exception::class.java){profile(System.getenv("SSH_TEST_OTHER_KEY"),pass).openSsh("127.0.0.1")?.close()}
         ServerSocket(0,1,InetAddress.getByName("127.0.0.1")).use {echo->
             echo.soTimeout=6000
             val server=thread(isDaemon=true){echo.accept().use {it.getOutputStream().write(it.getInputStream().read())}}

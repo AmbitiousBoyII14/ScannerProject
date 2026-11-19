@@ -76,7 +76,12 @@ internal class SshTransport private constructor(private val session:Session):Clo
             val remoteIn=ch.inputStream;val remoteOut=ch.outputStream
             try{ch.connect(8000)}catch(_:Exception){reply(5);return}
             reply(0);socket.soTimeout=0
-            thread(isDaemon=true,name="ssh-upload"){try{remoteOut.use {input.copyTo(it)}}catch(_:Exception){ch.disconnect()}}
+            thread(isDaemon=true,name="ssh-upload"){
+                try{remoteOut.use { stream ->
+                    val buf=ByteArray(16384)
+                    while(true){val n=input.read(buf);if(n<0)break;stream.write(buf,0,n);stream.flush()}
+                }}catch(_:Exception){ch.disconnect()}
+            }
             remoteIn.copyTo(output)
         }finally{ch.disconnect()}
     }

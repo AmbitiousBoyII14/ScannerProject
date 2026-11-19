@@ -10,6 +10,8 @@ trap cleanup EXIT
 sudo useradd -M -s /usr/sbin/nologin "$account"
 printf '%s:%s\n' "$account" "$SSH_TEST_PASSWORD" | sudo chpasswd
 ssh-keygen -q -t ecdsa -b 256 -f "$work/host" -N ''
+ssh-keygen -q -t ecdsa -b 256 -f "$work/different_host" -N ''
+export SSH_TEST_OTHER_KEY="$(cat "$work/different_host.pub")"
 export SSH_TEST_KEY="$(cat "$work/host.pub")"
 cat >"$work/sshd_config" <<CONFIG
 ListenAddress 127.0.0.1
