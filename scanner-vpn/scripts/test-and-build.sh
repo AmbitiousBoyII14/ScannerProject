@@ -43,6 +43,7 @@ export GATEWAY_TEST_CERT="$work/cert.pem"
 for i in {1..30}; do [[ -f "$work/ready" ]] && break; sleep .2; done
 test -f "$work/ready"
 if ! ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon --console=plain 2>&1 | tee "$work/build.log"; then
+  grep -E '(Could not (GET|HEAD|download|resolve)|status code|timed out|Temporary failure)' "$work/build.log" | head -8 | while IFS= read -r line; do echo "::error::$line"; done || true
   # Surface only build/test diagnostics (never environment variables or passwords).
   grep -E '(^(e: |ERROR: |\* What went wrong:|> |Execution failed)| FAILED$|Exception at )' "$work/build.log" | tail -25 | while IFS= read -r line; do echo "::error::$line"; done
   python3 - <<'PYTEST'
