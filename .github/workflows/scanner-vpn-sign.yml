@@ -38,4 +38,6 @@ jobs:
       - name: Publish verified APKs
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "scanner-vpn-signed-${GITHUB_RUN_ID}" apks/*.apk --target "$GITHUB_SHA" --title 'Scanner VPN · signed Android client' --prerelease --notes 'APK v2 signature verified against the Scanner VPN update certificate. Use the same CPU variant for updates.'
+        run: |
+          git archive --format=zip --output=Scanner-VPN-source.zip HEAD scanner-vpn .github/workflows/scanner-vpn-preview.yml .github/workflows/scanner-vpn-sign.yml
+          gh release create "scanner-vpn-signed-${GITHUB_RUN_ID}" apks/*.apk Scanner-VPN-source.zip --target "$GITHUB_SHA" --title 'Scanner VPN · signed Android client' --prerelease --notes 'APK v2 signature verified against the Scanner VPN update certificate. Use the same CPU variant for updates.'
