@@ -1,4 +1,5 @@
 <resources>
+    <string name="vpn_health_url" translatable="false">https://connectivitycheck.gstatic.com/generate_204</string>
     <string name="app_name">Scanner VPN</string>
     <string name="nav_home">Home</string>
     <string name="nav_servers">Servers</string>

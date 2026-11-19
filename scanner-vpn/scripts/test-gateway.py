@@ -1,5 +1,5 @@
 """Loopback-only TLS / WS / WSS adapters to the disposable CI sshd."""
-import asyncio,ssl,sys,pathlib
+import asyncio,ssl,sys,pathlib,os
 from websockets.asyncio.server import serve
 
 async def relay(up,down):
@@ -38,5 +38,7 @@ async def proof(reader,writer):
 async def main():
     d=pathlib.Path(sys.argv[1]);ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.load_cert_chain(d/'cert.pem',d/'key.pem')
     async with serve(ws,'127.0.0.1',22258),serve(ws,'127.0.0.1',22259,ssl=ctx),serve(ws,'127.0.0.1',22267,ssl=ctx,subprotocols=['binary'],process_request=enforce_route),await asyncio.start_server(proof,'127.0.0.1',22268),await asyncio.start_server(tls,'127.0.0.1',22260,ssl=ctx),await asyncio.start_server(raw_upgrade,'127.0.0.1',22261,ssl=ctx):
+        if os.environ.get('DEVICE_PROOF'):
+            protected=await asyncio.start_server(proof,'192.0.2.148',22269)
         (d/'ready').touch();await asyncio.Future()
 asyncio.run(main())

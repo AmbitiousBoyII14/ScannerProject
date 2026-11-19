@@ -9,7 +9,7 @@ phone_generated=()
 
 account="svpn${RANDOM}test"
 export SSH_TEST_USER="$account" SSH_TEST_PASSWORD="https://fixture.invalid/u?token=$(openssl rand -hex 16)&test=1"
-cleanup(){ if ((${#phone_generated[@]})); then rm -f -- "${phone_generated[@]}"; fi; if [[ -n "${udpgw_pid:-}" ]]; then kill "$udpgw_pid" || true; fi; if [[ -n "${gateway_pid:-}" ]]; then kill "$gateway_pid" || true; fi; if [[ -f "$work/pid" ]]; then sudo kill "$(cat "$work/pid")" || true; fi; sudo userdel "$account" || true; sudo rm -rf "$work"; }
+cleanup(){ if [[ ${DEVICE_PROOF:-0} == 1 ]]; then sudo iptables -D OUTPUT -d 192.0.2.148 -p tcp --dport 22269 -m owner ! --uid-owner "$account" -j REJECT || true; sudo ip addr del 192.0.2.148/32 dev lo || true; fi; if ((${#phone_generated[@]})); then rm -f -- "${phone_generated[@]}"; fi; if [[ -n "${udpgw_pid:-}" ]]; then kill "$udpgw_pid" || true; fi; if [[ -n "${gateway_pid:-}" ]]; then kill "$gateway_pid" || true; fi; if [[ -f "$work/pid" ]]; then sudo kill "$(cat "$work/pid")" || true; fi; sudo userdel "$account" || true; sudo rm -rf "$work"; }
 trap cleanup EXIT
 sudo useradd -M -s /usr/sbin/nologin "$account"
 printf '%s:%s\n' "$account" "$SSH_TEST_PASSWORD" | sudo chpasswd
@@ -28,7 +28,7 @@ UsePAM no
 PermitRootLogin no
 AllowUsers $account
 AllowTcpForwarding local
-PermitOpen 127.0.0.1:*
+PermitOpen 127.0.0.1:* 192.0.2.148:22269
 MaxSessions 0
 CONFIG
 sudo mkdir -p /run/sshd
@@ -45,14 +45,21 @@ cmake --build "$work/udpbuild" --target badvpn-udpgw --parallel 2
 fi
 export XRAY_TEST_DIR="$work"
 export GATEWAY_TEST_CERT="$work/cert.pem"
+if [[ $device == --device ]]; then
+  # The protected proof socket can only be reached by sshd's disposable user,
+  # not by the emulator's ordinary NAT path. All rules die with this CI VM.
+  sudo ip addr add 192.0.2.148/32 dev lo
+  sudo iptables -I OUTPUT -d 192.0.2.148 -p tcp --dport 22269 -m owner ! --uid-owner "$account" -j REJECT
+  export DEVICE_PROOF=1
+fi
 "$work/wsenv/bin/python" scripts/test-gateway.py "$work" & gateway_pid=$!
 for i in {1..30}; do [[ -f "$work/ready" ]] && break; sleep .2; done
 test -f "$work/ready"
 if [[ $device == --device ]]; then
   assets=app/src/androidTest/assets
   dbg=app/src/debug
-  mkdir -p "$assets" "$dbg/res/raw" "$dbg/res/xml"
-  candidates=("$assets/ci_gateway.json" "$dbg/AndroidManifest.xml" "$dbg/res/raw/ci_gateway_ca.pem" "$dbg/res/xml/ci_gateway_trust.xml")
+  mkdir -p "$assets" "$dbg/res/raw" "$dbg/res/xml" "$dbg/res/values"
+  candidates=("$assets/ci_gateway.json" "$dbg/AndroidManifest.xml" "$dbg/res/raw/ci_gateway_ca.pem" "$dbg/res/xml/ci_gateway_trust.xml" "$dbg/res/values/ci_health.xml")
   for f in "${candidates[@]}"; do [[ ! -e "$f" ]] || { echo "Refusing to overwrite $f"; exit 1; }; done
   phone_generated=("${candidates[@]}")
   cp "$work/cert.pem" "$dbg/res/raw/ci_gateway_ca.pem"
@@ -62,6 +69,7 @@ if [[ $device == --device ]]; then
 import json,os,pathlib
 pathlib.Path('app/src/androidTest/assets/ci_gateway.json').write_text(json.dumps({k:os.environ[v] for k,v in [('user','SSH_TEST_USER'),('secret','SSH_TEST_PASSWORD'),('hostKey','SSH_TEST_KEY')]}))
 PYFIX
+  echo '<resources><string name="vpn_health_url" translatable="false">http://127.0.0.1:22268/proof</string></resources>' > "$dbg/res/values/ci_health.xml"
   adb reverse tcp:22267 tcp:22267
   ./gradlew :app:connectedDebugAndroidTest --no-daemon --console=plain
   python3 - <<'PYCHECK'
