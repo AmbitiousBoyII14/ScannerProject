@@ -30,7 +30,7 @@ with http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler) as dest:
         out['streamSettings']['tlsSettings']['certificates']=[{'usage':'verify','certificateFile':str(work/'cert.pem')}]
         assert out['protocol']=='vless' and out['streamSettings']['security']=='tls'
         stream={'network':transport,'security':'tls','tlsSettings':{'certificates':[{'certificateFile':str(work/'cert.pem'),'keyFile':str(work/'key.pem')}]}}
-        if transport=='ws':stream['wsSettings']={'path':'/fixture'}
+        if transport=='ws':stream['wsSettings']={'path':'/fixture','host':'route.example.test'}
         server={'inbounds':[{'listen':'127.0.0.1','port':serverport,'protocol':'vless','streamSettings':stream,'settings':{'decryption':'none','clients':[{'id':'00000000-0000-4000-8000-000000000001'}]}}],'outbounds':[{'protocol':'freedom'}]}
         # This release blocks private destinations on a VLESS server by default. Permit only
         # our ephemeral HTTP proof socket; all other destinations remain blocked.

@@ -4,6 +4,10 @@
 
 This directory (`scanner-vpn/`) is the Gradle project to open. The repository-root `app/` is a different application; `web-preview/` is a simulation. The Android app here uses a bundled WebView for controls and a native `VpnService` for traffic. Package: `com.scannervpn.android`; minimum Android 7.0 (API 24).
 
+## 1.13 · V2ray settings
+
+Select **V2ray → Edit profile → Paste / import link**. VLESS, VMess (base64 JSON) and Trojan support separate TCP server address, WebSocket Host/path and TLS SNI. The form supports TCP/WS, Mux and verified TLS (mandatory for Trojan). SIP002 Shadowsocks import is limited to chacha20-ietf-poly1305 without plugins. REALITY, Vision/flow, gRPC, XHTTP and unhandled link extensions are not silently converted. The included Xray v26.11.9 removed `allowInsecure`; importing such a link requires explicit approval to use verified TLS. A certificate SHA-256 pin may be set manually. Use **〈 〉 JSON** to inspect/copy the config made by the native profile builder; unlike a generic outbound snippet, it includes Android routing and the configured connection policy. JSON contains the login/UUID. No example account is bundled or tested. The editor and parser are in [core-editor.js](app/src/main/assets/live/core-editor.js).
+
 ## 1.12 · UI handoff
 
 Open **`scanner-vpn/`** as the Gradle project. The working Android UI is in [`app/src/main/assets/live/`](app/src/main/assets/live/) (`index.html`, `style.css`, `ui.js`), **not** the old web demo. `ui.js` reads `Client.snapshot()` from [LiveActivity](app/src/main/java/com/example/live/LiveActivity.kt). [LiveState](app/src/main/java/com/example/live/LiveState.kt) supplies `log` and `checks` as timestamp, raw stage tag and message separated by two spaces; `results` contains per-endpoint summaries. Keep full values, including errors, visible and selectable; don't reconstruct handshake details or log account input. Session Copy and the optional SAF debug file use the native records.
