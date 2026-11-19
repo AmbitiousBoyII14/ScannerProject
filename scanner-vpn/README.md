@@ -1,61 +1,58 @@
-# Scanner VPN · Native client
+# Scanner VPN — Android source and progress
 
-The launcher is `com.example.live.LiveActivity`. Its bundled, network-disabled web UI uses the same visual design as the preview, but uses a native bridge instead of simulation code. `TunnelService` creates an Android TUN and passes its descriptor to AndroidLibXrayLite. IPv4 (including DNS) routes through the configured server. IPv6 is not enabled on the interface (Android blocks that family). The app UID is excluded to prevent the transport from routing into itself. This is not an always-on kill switch.
+**Current release: [1.8, signed APKs](https://github.com/AmbitiousBoyII14/ScannerProject/releases/tag/scanner-vpn-signed-44535731667)** · [1.8 source as built](https://github.com/AmbitiousBoyII14/ScannerProject/tree/fba880d02ddc031cbbc8120c7052a8c6c2850e49/scanner-vpn) · [Passing build and Android tests](https://github.com/AmbitiousBoyII14/ScannerProject/actions/runs/44534968663)
 
-**Profiles:** VLESS over TCP/TLS or WebSocket/TLS, Trojan/TLS and Shadowsocks (chacha20-ietf-poly1305). TLS uses the actual server name; no certificate verification overrides. No SSH, PHP, or arbitrary payload transport is advertised. Use your own compatible endpoint. Select Configuration, enter the server settings privately, save, then connect and grant Android VPN permission. Up to 12 session-only profiles; no credentials written to preferences, reports, notifications or logs.
+This directory (`scanner-vpn/`) is the Gradle project to open. The repository-root `app/` is a different application; `web-preview/` is a simulation. The Android app here uses a bundled WebView for controls and a native `VpnService` for traffic. Package: `com.scannervpn.android`; minimum Android 7.0 (API 24).
 
-The scanner verifies saved profiles, not unknown targets. Health checks request `https://connectivitycheck.gstatic.com/generate_204` using the selected Xray outbound. Failure may mean the check destination is unreachable, not that a server is dead. ONLINE indicates successful HTTPS through the outbound, not independent confirmation of a specific exit IP. Rates are calculated from native outbound counters. The running tunnel repeats its check about once per minute. Stopping a batch allows the current bounded request to finish.
+## Status as of 19 November 2026
 
-**Build:** JDK 17, Android SDK 36.1. Run `./scripts/fetch-core.sh` (verified SHA-256) and `./gradlew :app:assembleDebug`. The CI workflow publishes a debug-signed prerelease APK. If installing over a preview signed by a different CI debug key, Android may require uninstalling the old preview first.
+**Verified:** On an Android 15 emulator, the installed client negotiated WSS with a controlled gateway, verified the SSH host key, authenticated to OpenSSH and started the VPN. A request from the emulator shell (a different UID from the app) reached a protected endpoint through the TUN that it could not reach before connection. Separate tests cover direct SSH, SSH over TLS, raw HTTP upgrade, UDP echo via `badvpn-udpgw`, and VLESS TCP/TLS and WS/TLS outbounds. These are tests against controlled servers, not a certification of a provider preset.
 
-Native dependency: [AndroidLibXrayLite v26.11.9](https://github.com/2dust/AndroidLibXrayLite/tree/v26.11.9), including [Xray-core](https://github.com/XTLS/Xray-core/tree/676eaf66f8f0). Corresponding source, build instructions and module revisions are in those repositories. License texts are included in the app assets. Original Dark Tunnel fork is Apache-licensed (see LICENSE); legacy preview components are not registered as Android services or activities.
+**Still open — provider connection:** The 1.8 phone trace shows DNS resolution, TCP connect and TLS 1.3 success, followed by `HTTP 101 without Sec-WebSocket-Accept`. That is not a valid RFC 6455 WebSocket handshake. The attempt stopped before SSH host-key discovery completed or a password was sent. The trace does **not** prove the server is down, that the Host/SNI difference caused the response, or that the bytes following the headers are raw SSH.
 
-### Android client 1.2
+**Next diagnostic:** Confirm whether the provider expects binary WebSocket frames or an unframed SSH stream after its HTTP upgrade, and confirm the dial address, TLS name, HTTP Host and path from the same working profile. If it specifies raw SSH after upgrade, the existing control is **Payload → After HTTP upgrade → Raw SSH stream (no WebSocket framing)**. Keep SSL enabled if the gateway requires TLS. Turning SSL off changes encryption, not framing. Do not weaken certificate, WebSocket or SSH key checks to force a connection.
 
-- Screenshots are permitted by default. Settings persists optional screenshot blocking, display wake lock, log following and rate visibility (never credentials).
-- Scanner accepts pasted hostnames or a UTF-8 `.txt` document (up to 64 KiB) via Android's document picker. Unknown hosts must be configured first. A deduplicated list runs only matching saved profiles, using each profile's own credentials.
-- Also supports VMess over WebSocket/TLS and authenticated SOCKS5 / HTTP CONNECT over TLS. The server must accept the selected TLS transport; HTTP CONNECT only carries TCP. SSH and PHP relay cards are unavailable, not simulated.
-- CI ships individual standalone APKs per ABI. Most current Android phones use **arm64-v8a**. The app no longer packages the archived Compose preview (`legacy/`), and each APK contains only one compressed copy of the native engine. Compressed native libraries may use additional space after installation.
+## Release milestones
 
-### 1.3: direct SSH
+| Version | What changed |
+| --- | --- |
+| 1.1–1.2 | Native IPv4 VPN with Xray profiles, HTTPS health checks, traffic counters, settings, per-CPU APKs and batch import for saved server domains. |
+| 1.3–1.4 | Direct SSH TCP forwarding via JSch; one-line account entry; first-use host-key discovery, fingerprint confirmation and pinning. |
+| 1.5 | SSH, Log and Batch tabs; verified TLS and WebSocket SSH gateways; optional append-only `Scanner/debug.txt`; stable release signing identity. |
+| 1.6 | Separate editors for HTTP payload/framing, TLS/SNI, two IPv4 DNS resolvers and optional remote UDPgw. Added explicit account Copy, Paste and Hide controls. |
+| 1.7 | More precise WebSocket refusal diagnostics, Log Copy/Clear, and a fix for obsolete DNS outbound configuration that prevented the native core starting after successful SSH login. |
+| 1.8 | Preselected WSS route with editable Host/path. Opt-in **Remember SSH profile on this phone** stores an AES-GCM encrypted draft with an Android Keystore key; no login is bundled. |
 
-Choose **SSH** first, enter your server, username, exact password and its trusted OpenSSH public **host** key (`type base64 [comment]`). Obtain the key from your server administrator. The server must allow password authentication and TCP forwarding. Passwords are opaque text, including spaces and URL punctuation; editor drafts remain masked and in memory, not on disk. VLESS/VMess still require UUIDs.
+## Where to work
 
-The maintained [JSch](https://github.com/mwiede/jsch/tree/jsch-2.28.8) client verifies the host key before authenticating. Its session carries TCP via direct-tcpip channels. Xray uses a per-session authenticated loopback adapter; Android resolver DNS uses TCP through the same SSH session. Generic UDP and SSH-over-WebSocket/TLS are not implemented. See `scripts/test-and-build.sh` for the isolated OpenSSH forwarding test used before publishing.
+| Area | Source |
+| --- | --- |
+| Home screen, payload editor, presets | [Bundled HTML, CSS and JS](app/src/main/assets/live/) |
+| Android permissions, picker, host-key trust and UI bridge | [LiveActivity.kt](app/src/main/java/com/example/live/LiveActivity.kt) |
+| VPN lifecycle, routing and health checks | [TunnelService.kt](app/src/main/java/com/example/live/TunnelService.kt) and [Profile.kt](app/src/main/java/com/example/live/Profile.kt) |
+| Upgrade request, response validation and stream framing | [GatewayRequest.kt](app/src/main/java/com/example/live/GatewayRequest.kt), [GatewayDraft.kt](app/src/main/java/com/example/live/GatewayDraft.kt), [SshGateway.kt](app/src/main/java/com/example/live/SshGateway.kt) |
+| SSH forwarding and remote UDP gateway | [SshTransport.kt](app/src/main/java/com/example/live/SshTransport.kt) and [UdpGateway.kt](app/src/main/java/com/example/live/UdpGateway.kt) |
+| Tests | [JVM protocol tests](app/src/test/), [Android device tests](app/src/androidTest/), [fixture setup](scripts/test-and-build.sh) |
 
-### 1.4: SSH first use and quick account
+## Build and test
 
-Paste `host:port@username:password` on the VPN tab for direct SSH. The password is masked; additional `:` and `@` in it are literal. Leaving the field blank uses the selected saved profile (including non-SSH profiles). The Log sub-tab and batch scanner remain separate. The first SSH save fetches the host public key with strict host checking and no user credentials, then asks for confirmation of its fingerprint. Compare it with the provider's fingerprint via a trusted channel. Only confirmed public keys are persisted, scoped to hostname and port. After that, real SSH sessions enforce the stored key. A key change is not trusted automatically. Profile credentials remain session-only. This is not arbitrary HTTP Custom payload, certificate-bypass or cross-host routing compatibility.
+With JDK 17 and Android SDK 36.1 installed, run from the **repository root**:
 
-### 1.5: Android connection screen, storage and signed updates
+```sh
+cd scanner-vpn
+./scripts/fetch-core.sh  # downloads the pinned AAR and checks its SHA-256
+./gradlew :app:assembleDebug
+```
 
-Use the white/cyan SSH / Log / Batch tabs. On SSH, **SSL** adds verified TLS and **Use Payload** selects a standard binary WebSocket gateway (path in Edit profile). They may be combined if the provider supports WSS-to-SSH. Neither rewrites arbitrary HTTP payloads, spoofs a different hostname, or makes an ordinary website into a VPN. V2ray selects a separate core profile, with its own credentials and transport. The log distinguishes configured core options from genuinely negotiated SSH/TLS events. No fake HTTP response, cipher or connection result. Enhanced, SlowDns, UDP Custom and Psiphon have no native engine here.
+Debug APKs are under `app/build/outputs/apk/debug/`, split by ABI. Most current phones use `arm64-v8a`. A locally debug-signed APK **cannot update** the published release in place. For a normal phone update, use the signed release above. CI verifies each release APK against the [public update certificate](signing/update-cert.pem); the private key is not part of the source.
 
-At launch, grant the Android folder picker access to **Scanner** in internal storage (create it if needed), or choose **Documents** for `Documents/Scanner/debug.txt`. The writer appends each session/batch event; prior sessions aren't overwritten. Cancelling doesn't block VPN use. Settings can change or regrant the folder. This uses persisted Storage Access Framework access, not all-files or legacy write permissions. Logs contain endpoint addresses and timing; they do not include profile secrets. Delete debug.txt when no longer needed.
+For the full test suite, use the [build workflow](../.github/workflows/scanner-vpn-preview.yml). It runs `scripts/test-and-build.sh` on a **disposable Linux runner** (creates a temporary system user and loopback servers) and runs `--device` with an emulator. The test CA and local health endpoint are for the test build only. Release health checks use HTTPS.
 
-Release builds use the checked-in **public** update certificate `signing/update-cert.pem`, not a CI debug key. The build runner emits four v2 signing requests after tests; the operator checks the run/commit and signs the requests offline with `scripts/apk-envelope.py approve <run-id> < requests.json`. Publishing attaches only those signatures to that run's exact artifacts. Android SDK apksigner verifies every APK and the certificate digest before upload. Keep an offline backup of the private key (workspace `scanner-vpn/.private/update-key.pem`); never commit it. Loss of the key prevents signing future compatible updates. The Android package ID stays `com.scannervpn.android`; switching from the old disposable debug certificate may require one uninstall.
+## Operational limits
 
-CI runs the app's JSch discovery/authentication against disposable direct, TLS, WS, and WSS SSH gateways and exercises direct-tcpip forwarding. It separately takes the app-generated VLESS TCP/TLS and WS/TLS outbounds into the matching desktop Xray release and transfers a random proof via a loopback server. This tests protocol behavior, not a physical phone's Android TUN, folder picker, or any particular provider.
+- **SSH** carries TCP. Resolver DNS is forwarded over TCP via SSH; general IPv4 UDP requires a compatible remote `badvpn-udpgw`. **VLESS/VMess, Trojan, Shadowsocks, SOCKS5 and HTTP CONNECT** use distinct Xray outbounds, not SSH login.
+- The VPN installs an IPv4 default route and excludes its own UID to prevent loops. It is not an always-on kill switch. A successful host-key fetch or an HTTP 101 alone does not mark the VPN connected.
+- **Batch** checks saved, configured endpoints independently of an active VPN. **Log → Clear** clears the in-memory session log, not batch results or `debug.txt`. File logging needs a user-selected folder; endpoints and timings may be present in the log.
+- Enhanced, SlowDns, Psiphon and arbitrary multi-request payloads are not implemented. The SSH payload editor supports a single HTTP upgrade request; binary mode generates a fresh WebSocket key for each connection.
 
-### 1.6: provider connection fields
-
-Paste the whole SSH account into the visible account line; **Copy / Paste / Hide** operate on that field without rewriting the password. The keyboard's usual select/paste also works. No clipboard service runs in the background. Only the explicit buttons access it.
-
-- **Payload** accepts one HTTP/1.1 GET upgrade request, with actual line breaks, `[crlf]` or literal `\r\n`. Choose framed RFC 6455 WebSocket or an HTTP 101 followed by an unframed SSH stream. Host, Connection, Upgrade, User-Agent, Origin and X-headers are supported. No request splitting, proxy chaining, ambiguous framing or certificate bypass. The editor rejects unsupported syntax instead of silently discarding it. A normal HTTP 200 page is not a tunnel.
-- **SSL / SNI** specifies the certificate name independently of the account's dial address. Blank means the account host. HTTP Host is taken from the payload. For VLESS, TLS options are in its own profile editor.
-- **DNS IPs** installs the preferred and optional second IPv4 resolver on Android. SSH resolver requests still travel as TCP via SSH; this is not the bootstrap resolver for the SSH endpoint.
-- **UDPgw settings** takes the provider's badvpn-udpgw IPv4:port on the remote side of SSH. With it enabled, the local authenticated SOCKS adapter can relay IPv4 UDP via direct-tcpip to that gateway. Generic UDP is otherwise off for SSH. A TCP forwarding channel opening is logged as such, not as proof of UDP delivery.
-
-The APK build tests raw HTTP-upgrade-over-TLS, WSS, direct SSH/TLS, VLESS, and a UDP echo round trip through a disposable OpenSSH server and upstream badvpn-udpgw. The Android instrumentation test drives the installed WebView, uses the real clipboard, edits the payload/SNI/DNS/UDPgw, and checks a refused upgrade without sending credentials. Tests never use a provider account.
-
-### 1.7: WebSocket upgrade diagnostics and session log tools
-
-Log → **Copy** copies the current session lines only. **Clear** asks for confirmation and clears the in-memory session log, not the VPN connection, batch results or on-disk `debug.txt`. Binary WebSocket now reports observed HTTP refusal codes, malformed 101 upgrades, or missing responses separately. For providers that explicitly require it, the payload editor accepts `Sec-WebSocket-Protocol: binary`; leaving it out preserves ordinary RFC 6455 behavior. No automatic protocol downgrade, auth retries or path guessing.
-
-`./scripts/test-and-build.sh --device` (disposable Linux CI runner with a running emulator) provisions a loopback WSS gateway with a route and mandatory binary subprotocol. The installed Android test reproduces 404 and 426 responses, discovers and verifies the SSH host key, logs in to OpenSSH and checks an HTTP 204 via the native Xray outbound and SSH forwarding. No provider credentials are used. The ephemeral test CA is scoped to localhost in the instrumentation build only; nothing is added to the released trust store. The test then starts the Android VPN service and requests a protected 204 from the emulator shell UID through the TUN. The fixture is unreachable before connection. Only the disposable test build uses a local HTTP health probe inside the TLS tunnel; the release still checks HTTPS.
-
-The Android test exposed a post-authentication failure in 1.6: the embedded core rejects the removed outbound `proxySettings` field. SSH DNS forwarding in 1.7 chains to the authenticated adapter using `streamSettings.sockopt.dialerProxy` instead. This is separate from a gateway refusing the initial HTTP upgrade.
-
-### 1.8: preselected SSH/WSS preset and optional local login
-
-On a fresh launch the address, verified TLS name (defaults to the dial hostname), WebSocket framing, GET path, HTTP Host and User-Agent are selected. There is no provider login in the APK. Complete the account line once. **Remember SSH profile on this phone** saves that draft on Connect using authenticated AES-GCM encryption, with a non-exportable Android Keystore key and a private no-backup file. Uncheck to remove it. Restoring a draft does not grant VPN consent or bypass SSH pin checks. Binary mode uses version 13 and a fresh WebSocket key, even if a sample supplied a fixed key. This preset is not a verification of the provider's live origin or routing.
+[Project license](LICENSE) · [Dependency notices](app/src/main/assets/licenses/) · [AndroidLibXrayLite v26.11.9](https://github.com/2dust/AndroidLibXrayLite/tree/v26.11.9) · [Earlier version-by-version notes](https://github.com/AmbitiousBoyII14/ScannerProject/blob/a0434bdeeede0149dc0fe9a1673a4d238d2ed74e/scanner-vpn/README.md)
