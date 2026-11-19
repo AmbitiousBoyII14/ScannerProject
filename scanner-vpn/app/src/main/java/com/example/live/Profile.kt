@@ -42,7 +42,7 @@ internal class Profile(val mode:String,val host:String,val port:Int,private val 
         val config=obj("log" to obj("loglevel" to "none"),"stats" to obj(),"policy" to obj("system" to obj("statsOutboundUplink" to true,"statsOutboundDownlink" to true)),"inbounds" to arr(obj("protocol" to "tun","settings" to obj("name" to "scanner0","mtu" to 1500))),"outbounds" to arr(out))
         if(isSsh){
             // SSH forwards TCP only. Translate Android resolver UDP into TCP DNS via the same SSH channel.
-            config.getJSONArray("outbounds").put(obj("tag" to "resolver","protocol" to "dns","proxySettings" to obj("tag" to "vpn"),"settings" to obj("rewriteNetwork" to "tcp","rules" to arr(obj("action" to "direct")))))
+            config.getJSONArray("outbounds").put(obj("tag" to "resolver","protocol" to "dns","streamSettings" to obj("sockopt" to obj("dialerProxy" to "vpn")),"settings" to obj("rewriteNetwork" to "tcp","rules" to arr(obj("action" to "direct")))))
             config.put("routing",obj("rules" to arr(obj("ip" to arr(*listOf(dns,dns2).filter{it.isNotEmpty()}.distinct().toTypedArray()),"port" to "53","network" to "udp","outboundTag" to "resolver"))))
         }
         return config.toString()
