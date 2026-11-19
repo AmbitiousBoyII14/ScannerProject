@@ -27,7 +27,7 @@ internal class Profile(val mode:String,val host:String,val port:Int,private val 
         if(!isSsh){
             log("OUTBOUND","${mode.substringBefore(' ')} · $host:$port · using Xray")
             log("CONFIG",if(" WS" in mode) "WebSocket transport selected" else "TCP transport selected")
-            if(mode.endsWith("TLS"))log("CONFIG","TLS peer verification enabled for $host")
+            if(mode.endsWith("TLS"))log("CONFIG","TLS peer verification enabled for ${sni.ifBlank{host}}")
             return null
         }
         log("SSH","Opening $mode session to $host:$port; verifying pinned host key")

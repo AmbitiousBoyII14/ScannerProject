@@ -38,7 +38,7 @@ internal class SshGateway(private val peer:String,private val tls:Boolean,privat
                 event("HTTP","HTTP 101 · waiting for raw SSH identification");return
             }
             val uri=URI("${if(tls) "wss" else "ws"}://${req.authority}${req.path}");var problem="WebSocket handshake rejected; check gateway and path"
-            val w=object:WebSocketClient(uri,Draft_6455(emptyList(),emptyList<org.java_websocket.protocols.IProtocol>()+org.java_websocket.protocols.Protocol(""),1048576),req.headers+mapOf("Host" to req.authority),timeout){
+            val w=object:WebSocketClient(uri,Draft_6455(emptyList(),1048576),req.headers+mapOf("Host" to req.authority),timeout){
                 override fun onOpen(h:ServerHandshake){event("WS","HTTP ${h.httpStatus} · binary WebSocket open")}
                 override fun onMessage(text:String){end();closeConnection(1003,"Binary SSH stream required")}
                 override fun onMessage(data:ByteBuffer){val bytes=ByteArray(data.remaining());data.get(bytes);if(bytes.isNotEmpty())while(!ended&&!chunks.offer(bytes,200,TimeUnit.MILLISECONDS)){} }

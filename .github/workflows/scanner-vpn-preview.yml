@@ -33,3 +33,29 @@ jobs:
           name: Scanner-VPN-preview
           path: apks/*.apk
           if-no-files-found: error
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: scanner-vpn/scripts/fetch-core.sh
+      - run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: cd scanner-vpn && ./gradlew :app:connectedDebugAndroidTest --no-daemon --console=plain
+      - name: Instrumentation diagnostics
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob,xml.etree.ElementTree as E
+          for file in glob.glob('scanner-vpn/app/build/outputs/androidTest-results/**/*.xml',recursive=True):
+              for node in E.parse(file).iter('failure'): print('::error::'+node.attrib.get('message','device test failed')[:500])
+          PY

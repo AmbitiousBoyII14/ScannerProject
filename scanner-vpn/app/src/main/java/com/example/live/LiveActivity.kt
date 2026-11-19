@@ -4,13 +4,15 @@ import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
 import android.os.*
+import android.view.View
 import android.view.WindowManager
 import android.webkit.*
 import android.widget.Toast
 
 class LiveActivity:Activity(){
     private lateinit var web:WebView
-    override fun onCreate(saved:Bundle?){super.onCreate(saved);applySettings();web=WebView(this);web.settings.apply{javaScriptEnabled=true;allowFileAccess=false;allowContentAccess=false;blockNetworkLoads=true;domStorageEnabled=false};web.webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView?,request:WebResourceRequest?)=true;override fun shouldInterceptRequest(view:WebView?,request:WebResourceRequest):WebResourceResponse{val path=request.url.path;return if(request.url.host=="app.invalid"&&path in listOf("/index.html","/style.css","/ui.js")){val mime=when(path){"/index.html"->"text/html";"/ui.js"->"text/javascript";else->"text/css"};WebResourceResponse(mime,"utf-8",assets.open("live$path"))}else WebResourceResponse("text/plain","utf-8",null)}};web.addJavascriptInterface(Bridge(),"Client");setContentView(web);web.setOnApplyWindowInsetsListener{v,i->v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom);i};web.loadUrl("https://app.invalid/index.html");if(!DebugFile.init(this)&&saved==null)web.post{askForFolder()}}
+    override fun onCreate(saved:Bundle?){super.onCreate(saved);applySettings();web=WebView(this);web.settings.apply{javaScriptEnabled=true;allowFileAccess=false;allowContentAccess=false;blockNetworkLoads=true;domStorageEnabled=false};web.webViewClient=object:WebViewClient(){override fun shouldOverrideUrlLoading(view:WebView?,request:WebResourceRequest?)=true;override fun shouldInterceptRequest(view:WebView?,request:WebResourceRequest):WebResourceResponse{val path=request.url.path;return if(request.url.host=="app.invalid"&&path in listOf("/index.html","/style.css","/ui.js")){val mime=when(path){"/index.html"->"text/html";"/ui.js"->"text/javascript";else->"text/css"};WebResourceResponse(mime,"utf-8",assets.open("live$path"))}else WebResourceResponse("text/plain","utf-8",null)}};web.addJavascriptInterface(Bridge(),"Client");val frame=android.widget.FrameLayout(this);frame.setBackgroundColor(android.graphics.Color.WHITE);frame.addView(web);setContentView(frame);window.decorView.systemUiVisibility=window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        frame.setOnApplyWindowInsetsListener{v,i->if(Build.VERSION.SDK_INT>=30){val b=i.getInsets(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout() or android.view.WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,b.bottom)}else v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom);i};frame.requestApplyInsets();web.loadUrl("https://app.invalid/index.html");if(!DebugFile.init(this)&&saved==null)web.post{askForFolder()}}
     private fun askForFolder(){
         android.app.AlertDialog.Builder(this).setTitle("Save Scanner/debug.txt?").setMessage("Choose or create Scanner in internal storage, or select Documents and Scanner will be created inside it. Debug logs include server addresses and connection results, never account passwords. Android requires your approval once.")
           .setPositiveButton("Choose folder"){_,_->try{startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION),44)}catch(e:Exception){Toast.makeText(this,"No folder picker available",Toast.LENGTH_LONG).show()}}
@@ -68,6 +70,9 @@ class LiveActivity:Activity(){
         }catch(e:Exception){enrollmentResult("Check the account format, server, port and username. Stop active sessions before saving.",false)}
     }
     inner class Bridge{
+        @JavascriptInterface fun copyAccount(value:String){if(value.isEmpty()||value.length>16384)return;runOnUiThread{
+            val clip=android.content.ClipData.newPlainText("SSH account",value);if(Build.VERSION.SDK_INT>=24)clip.description.extras=android.os.PersistableBundle().apply{putBoolean("android.content.extra.IS_SENSITIVE",true)};getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(clip)
+        }}
         @JavascriptInterface fun pasteAccount(){runOnUiThread{
             val clip=getSystemService(android.content.ClipboardManager::class.java).primaryClip
             val value=clip?.takeIf{it.itemCount>0}?.getItemAt(0)?.text?.toString()?.takeIf{it.length<=16384}
