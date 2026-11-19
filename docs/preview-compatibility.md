@@ -1,0 +1,16 @@
+# What can be combined in the web preview?
+
+This is a **single-outbound simulation policy**, not a reverse-engineered specification for HTTP Custom 6.9. On the reference screenshot, Use Payload + SSL + Enable DNS are visibly selected together. I did not find a reliable public truth table for that release or the meaning of its Enhanced switch. Newer publisher descriptions list multiple protocol families but don't establish the old UI's exact rules. [1](https://www.apkmirror.com/apk/epro-dev-team/http-custom-aio-tunnel-vpn/)
+
+| Mode in this preview | Options and limits we chose | Basis |
+|---|---|---|
+| SSH (default) | Plain TCP, TLS wrapper, HTTP gateway fixture, or both wrappers; SSH account and authentication only here. Forwarding is separate from login. | SSH exchanges version strings and negotiates keys. `direct-tcpip` forwarding requires the recipient's approval. [3](https://www.rfc-editor.org/rfc/pdfrfc/rfc4253.txt.pdf) [1](https://www.rfc-editor.org/info/rfc4254/) |
+| V2ray → VLESS or VMess | Choose one outbound; TCP or WebSocket, with TLS configured **inside** the profile. UUID field instead of SSH account. | Xray separates protocol, transport and transport security. Both outbounds support raw and WebSocket transports; the preview models only a subset. [1](https://github.com/XTLS/Xray-docs-next/blob/main/docs/en/config/transport.md) [1](https://xtls.github.io/en/config/outbounds/vless.html) |
+| V2ray → Trojan | Password; TCP or WebSocket, with TLS required in our public-server preset. | Xray documents Trojan's password and transport-security requirement for public use. [3](https://xtls.github.io/en/config/outbounds/trojan.html) |
+| V2ray → Shadowsocks (SS) | Plain AEAD preset: method + secret; no extra TLS or WS handshake in its log. This is a preset restriction, not a claim about all plugins. | The AEAD specification describes encrypted TCP streams and UDP packets. Xray requires a method and credential. [2](https://shadowsocks.org/doc/aead.html) [2](https://xtls.github.io/en/config/outbounds/shadowsocks.html) |
+| Psiphon | Separate managed mode; no user-supplied SSH login or invented negotiated algorithms. | Psiphon describes selecting its connection approach dynamically. [1](https://psiphon.ca/en/faq.html) |
+| SlowDns / UDP Custom | Separate provider-mode placeholders, not DNS-resolver settings or an automatic SSH UDP gateway. The preview doesn't invent undocumented internal exchanges. | Product listings distinguish tunneling modes, not a version-specific compatibility matrix. [2](https://http-custom-ssh-vpn-client-with-custom-header.soft112.com/) |
+
+**Log accuracy:** The WebSocket fixture shows a validated HTTP/1.1 upgrade, whereas the HTTP CONNECT fixture shows a 2xx tunnel response. They are not two required consecutive stages. [2](https://www.rfc-editor.org/rfc/rfc6455.html) [2](https://www.rfc-editor.org/rfc/rfc9110.html)
+
+**UI contract:** Enable DNS configures virtual-interface resolvers; disabling it doesn't prevent a server hostname from being resolved. Switching engines deactivates SSH-only options and restores them when returning to SSH. Inactive tools display a reason in the drawer. All connection settings lock during a run, including batch. No probes, credential logging or changes to the Android app.
