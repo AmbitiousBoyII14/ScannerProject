@@ -18,7 +18,7 @@ class SshTransportTest {
             java.io.File(cert).inputStream().use{ks.setCertificateEntry("fixture",java.security.cert.CertificateFactory.getInstance("X.509").generateCertificate(it))}
             val tm=javax.net.ssl.TrustManagerFactory.getInstance(javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm());tm.init(ks)
             javax.net.ssl.SSLContext.setDefault(javax.net.ssl.SSLContext.getInstance("TLS").apply{init(null,tm.trustManagers,null)})
-            for((mode,port) in listOf("SSH WS" to 22258,"SSH WS TLS" to 22259,"SSH TLS" to 22260,"SSH HTTP TLS" to 22261)){
+            for((mode,port) in listOf("SSH WS" to 22258,"SSH WS TLS" to 22259,"SSH TLS" to 22260,"SSH HTTP TLS" to 22261,"SSH WS+Raw TLS" to 22259,"SSH WS+Raw TLS" to 22270)){
                 val p=Profile.read(obj("mode" to mode,"host" to "127.0.0.1","sni" to "localhost","payload" to if(mode.contains("HTTP")) "GET /ssh HTTP/1.1[crlf]Host: [host][crlf]Connection: Upgrade[crlf]Upgrade: ssh[crlf]X-Fixture: proof[crlf][crlf]" else "","port" to port,"user" to System.getenv("SSH_TEST_USER"),"secret" to System.getenv("SSH_TEST_PASSWORD"),"hostKey" to System.getenv("SSH_TEST_KEY")).toString())
                 val key=SshTransport.discover(p.host,p.port,p.gateway{_,_->});assertEquals(System.getenv("SSH_TEST_KEY").split(" ").take(2).joinToString(" "),key.first)
                 p.openSsh("127.0.0.1")!!.use{assertTrue(it.port>0)}

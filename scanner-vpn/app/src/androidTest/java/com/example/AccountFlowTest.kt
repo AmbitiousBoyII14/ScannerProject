@@ -35,6 +35,7 @@ class AccountFlowTest {
             js("document.querySelector('[data-tool=payload]').click()");js("document.querySelector('#body select').value='ws';document.querySelector('#body textarea').value='GET /fixture HTTP/1.1[crlf]Host: [host][crlf]Connection: Upgrade[crlf]Upgrade: websocket';document.querySelector('#body .apply').click()")
             until("!document.getElementById('sheet').open")
             js("document.querySelector('[data-tool=sni]').click();document.querySelector('#body input').value='localhost';document.querySelector('#body .apply').click()");until("document.getElementById('profile').textContent==='SSH WS TLS'")
+            js("document.querySelectorAll('#flags input')[2].click()");until("document.getElementById('profile').textContent==='SSH WS+Raw TLS'")
             // Local 403 fixture is deliberately plain HTTP.
             js("document.querySelectorAll('#flags input')[1].click();document.querySelector('[data-tool=dns]').click();document.querySelectorAll('#body input')[1].value='9.9.9.9';document.querySelector('#body .apply').click()");js("document.querySelector('[data-tool=udp]').click();document.querySelector('#body .apply').click();document.getElementById('remember').click();document.getElementById('connect').click()")
             assertEquals("GET /fixture HTTP/1.1",received.poll(15,TimeUnit.SECONDS));until("document.getElementById('events').textContent.includes('HTTP 403')");assertEquals("false",js("document.getElementById('events').textContent.includes('example.test/password')"))

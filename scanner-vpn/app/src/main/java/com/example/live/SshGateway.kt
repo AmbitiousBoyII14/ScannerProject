@@ -2,9 +2,11 @@ package com.example.live
 
 import com.jcraft.jsch.Proxy
 import com.jcraft.jsch.SocketFactory
-import org.java_websocket.client.WebSocketClient
+import org.java_websocket.*
+import org.java_websocket.handshake.HandshakeImpl1Client
+import kotlin.concurrent.thread
 import java.util.concurrent.atomic.AtomicReference
-import org.java_websocket.handshake.ServerHandshake
+import org.java_websocket.handshake.Handshakedata
 import java.io.*
 import java.net.*
 import java.nio.ByteBuffer
@@ -14,9 +16,9 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
 /** Dial the account address. TLS authenticates the configured server name before any HTTP or SSH data. */
-internal class SshGateway(private val peer:String,private val tls:Boolean,private val request:GatewayRequest?,private val binary:Boolean,private val event:(String,String)->Unit):Proxy {
+internal class SshGateway(private val peer:String,private val tls:Boolean,private val request:GatewayRequest?,private val binary:Boolean,private val allowRaw:Boolean,private val event:(String,String)->Unit):Proxy {
     private var raw:Socket?=null
-    private var client:WebSocketClient?=null
+    private var framed=false
     private lateinit var source:InputStream
     private lateinit var sink:OutputStream
     @Volatile private var ended=false
@@ -27,34 +29,54 @@ internal class SshGateway(private val peer:String,private val tls:Boolean,privat
             val tcp=Socket();raw=tcp;tcp.connect(InetSocketAddress(host,port),timeout);tcp.soTimeout=timeout
             event("TCP","Connected to ${tcp.inetAddress.hostAddress}:$port")
             val socket=if(tls){stage="TLS handshake";event("TLS","Verifying server name $peer");val s=(SSLSocketFactory.getDefault() as SSLSocketFactory).createSocket(tcp,peer,port,true) as SSLSocket;raw=s;s.sslParameters=s.sslParameters.apply{endpointIdentificationAlgorithm="HTTPS";if(peer.any{it.isLetter()})serverNames=listOf(javax.net.ssl.SNIHostName(peer))};s.startHandshake();event("TLS","${s.session.protocol} · ${s.session.cipherSuite}");s}else tcp
-            source=socket.inputStream;sink=socket.outputStream
+            source=socket.inputStream.buffered();sink=socket.outputStream
             val req=request ?: return
             stage="HTTP upgrade";event("HTTP",if(binary)"Requesting binary WebSocket upgrade" else "Sending HTTP upgrade for a raw SSH stream")
-            if(!binary){sink.write(req.raw());sink.flush();val buf=ByteArrayOutputStream();var tail=0
-                while(tail!=0x0d0a0d0a){val b=source.read();if(b<0||buf.size()>=16384)throw GatewayFailure("Incomplete or oversized HTTP response headers");tail=(tail shl 8) or b;buf.write(b)}
-                val lines=buf.toString("US-ASCII").split("\r\n");val code=Regex("HTTP/1\\.[01] ([0-9]{3})(?: .*|$)").matchEntire(lines.first())?.groupValues?.get(1)?:throw GatewayFailure("Gateway did not return an HTTP response")
+            if(!binary){sink.write(req.raw());sink.flush();val lines=readGatewayHeaders(source).toString(Charsets.US_ASCII).split("\r\n");val code=Regex("HTTP/1\\.[01] ([0-9]{3})(?: .*|$)").matchEntire(lines.first())?.groupValues?.get(1)?:throw GatewayFailure("Gateway did not return an HTTP response")
                 if(code!="101")throw GatewayFailure("HTTP $code · gateway did not switch protocols")
                 if(lines.none{it.substringBefore(':').equals("connection",true)&&it.substringAfter(':').split(',').any{v->v.trim().equals("upgrade",true)}})throw GatewayFailure("HTTP 101 missing Connection: Upgrade")
                 if(lines.none{it.substringBefore(':').equals("upgrade",true)&&it.substringAfter(':').trim().equals(req.upgrade,true)})throw GatewayFailure("HTTP 101 without the requested Upgrade header")
                 event("HTTP","HTTP 101 · waiting for raw SSH identification");return
             }
-            val uri=URI("${if(tls) "wss" else "ws"}://${req.authority}${req.path}");val problem=AtomicReference<String?>(null)
-            val w=object:WebSocketClient(uri,GatewayDraft(req.binaryProtocol){problem.set(it)},req.headers+mapOf("Host" to req.authority),timeout){
-                override fun onOpen(h:ServerHandshake){event("WS","HTTP ${h.httpStatus} · binary WebSocket open")}
-                override fun onMessage(text:String){end();closeConnection(1003,"Binary SSH stream required")}
-                override fun onMessage(data:ByteBuffer){val bytes=ByteArray(data.remaining());data.get(bytes);if(bytes.isNotEmpty())while(!ended&&!chunks.offer(bytes,200,TimeUnit.MILLISECONDS)){} }
-                override fun onClose(code:Int,reason:String?,remote:Boolean){end()}
-                override fun onError(e:Exception){problem.compareAndSet(null,failureReason(e,"WebSocket I/O failed before the upgrade completed."));end()}
-            };client=w;w.setSocket(socket);if(!w.connectBlocking(timeout.toLong(),TimeUnit.MILLISECONDS))throw GatewayFailure(problem.get()?:"No valid WebSocket upgrade completed before the connection closed or timed out. Confirm the gateway Host, path and framing.");socket.soTimeout=0
+            // Use the library's protocol engine, but own the socket so either framing can
+            // continue after one request, with the same nonce, TCP connection and TLS session.
+            val input=source;val output=sink;val problem=AtomicReference<String?>(null)
+            val listener=object:WebSocketAdapter(){
+                override fun onWriteDemand(conn:WebSocket){synchronized(output){
+                    val queue=(conn as WebSocketImpl).outQueue
+                    while(true){val b=queue.poll()?:break;output.write(b.array(),b.arrayOffset()+b.position(),b.remaining())};output.flush()
+                }}
+                override fun onWebsocketOpen(conn:WebSocket,h:Handshakedata){event("WS","HTTP 101 · binary WebSocket open")}
+                override fun onWebsocketMessage(conn:WebSocket,text:String){close()}
+                override fun onWebsocketMessage(conn:WebSocket,data:ByteBuffer){val bytes=ByteArray(data.remaining());data.get(bytes);if(bytes.isNotEmpty())while(!ended&&!chunks.offer(bytes,200,TimeUnit.MILLISECONDS)){} }
+                override fun onWebsocketClose(conn:WebSocket,code:Int,reason:String,remote:Boolean){end()}
+                override fun onWebsocketError(conn:WebSocket,e:Exception){problem.compareAndSet(null,failureReason(e,"WebSocket I/O failed"));end()}
+                override fun onWebsocketClosing(conn:WebSocket,code:Int,reason:String,remote:Boolean){end()}
+                override fun onWebsocketCloseInitiated(conn:WebSocket,code:Int,reason:String){}
+                override fun getRemoteSocketAddress(conn:WebSocket)=socket.remoteSocketAddress as InetSocketAddress
+                override fun getLocalSocketAddress(conn:WebSocket)=socket.localSocketAddress as InetSocketAddress
+            }
+            val w=WebSocketImpl(listener,GatewayDraft(req.binaryProtocol){problem.set(it)})
+            w.startHandshake(HandshakeImpl1Client().apply {resourceDescriptor=req.path;put("Host",req.authority);req.headers.forEach{(k,v)->put(k,v)}})
+            val reply=readGatewayHeaders(input)
+            if(allowRaw && mayUseRaw(reply)){
+                event("HTTP","HTTP 101 without Sec-WebSocket-Accept · raw SSH selected; waiting for SSH identification");return
+            }
+            w.decode(ByteBuffer.wrap(reply));if(!w.isOpen)throw GatewayFailure(problem.get()?:"WebSocket upgrade validation failed")
+            framed=true;socket.soTimeout=0
+            thread(isDaemon=true,name="ssh-ws-read"){
+                try{val buf=ByteArray(16384);while(!ended){val n=input.read(buf);if(n<0)break;w.decode(ByteBuffer.wrap(buf,0,n))}}
+                catch(_:Exception){}finally{close()}
+            }
             source=object:InputStream(){var part=ByteArray(0);var pos=0
                 override fun read():Int{val b=ByteArray(1);return if(read(b)<0)-1 else b[0].toInt() and 255}
                 override fun read(b:ByteArray,off:Int,len:Int):Int{if(len==0)return 0;while(pos==part.size){if(ended&&chunks.isEmpty())return -1;part=chunks.poll(12,TimeUnit.SECONDS)?:throw SocketTimeoutException();pos=0};val n=minOf(len,part.size-pos);part.copyInto(b,off,pos,pos+n);pos+=n;return n}}
             sink=object:OutputStream(){override fun write(v:Int)=write(byteArrayOf(v.toByte()));override fun write(b:ByteArray,off:Int,len:Int){if(ended)throw EOFException();if(len>0){val limit=System.nanoTime()+TimeUnit.SECONDS.toNanos(12);while(w.hasBufferedData()){if(ended||System.nanoTime()>limit)throw SocketTimeoutException();Thread.sleep(2)};w.send(b.copyOfRange(off,off+len))}}}
         }catch(e:Exception){val reason=failureReason(e,"$stage failed");event("ERROR",reason);close();throw e}
     }
-    override fun getSocket():Socket?=if(binary&&request!=null)null else raw
+    override fun getSocket():Socket?=if(framed)null else raw
     override fun getInputStream()=source
     override fun getOutputStream()=sink
     private fun end(){ended=true;chunks.offer(ByteArray(0))}
-    override fun close(){end();runCatching{raw?.close()};runCatching{client?.close()}}
+    override fun close(){end();runCatching{raw?.close()}}
 }
