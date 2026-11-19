@@ -4,7 +4,9 @@ package com.example.live
 internal fun failureReason(error:Exception,fallback:String):String {
     val chain=generateSequence<Throwable>(error){it.cause}.take(6).toList()
     val text=chain.joinToString(" "){it.message.orEmpty()}.lowercase()
+    chain.filterIsInstance<GatewayFailure>().firstOrNull()?.let{return it.detail}
     return when {
+        chain.any{it is javax.net.ssl.SSLHandshakeException || it is javax.net.ssl.SSLPeerUnverifiedException}->"TLS handshake failed. Check the SNI name, certificate and TLS port."
         chain.any{it is java.net.UnknownHostException}->"DNS lookup failed."
         chain.any{it is com.jcraft.jsch.JSchHostKeyException}->"SSH host key does not match the trusted server. Connection refused."
         "auth fail" in text || "userauth fail" in text->"SSH server rejected authentication. Check the account and authentication method."

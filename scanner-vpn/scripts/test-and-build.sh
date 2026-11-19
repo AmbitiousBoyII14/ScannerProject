@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 work=$(mktemp -d)
 account="svpn${RANDOM}test"
 export SSH_TEST_USER="$account" SSH_TEST_PASSWORD="https://fixture.invalid/u?token=$(openssl rand -hex 16)&test=1"
-cleanup(){ if [[ -n "${gateway_pid:-}" ]]; then kill "$gateway_pid" || true; fi; if [[ -f "$work/pid" ]]; then sudo kill "$(cat "$work/pid")" || true; fi; sudo userdel "$account" || true; sudo rm -rf "$work"; }
+cleanup(){ if [[ -n "${udpgw_pid:-}" ]]; then kill "$udpgw_pid" || true; fi; if [[ -n "${gateway_pid:-}" ]]; then kill "$gateway_pid" || true; fi; if [[ -f "$work/pid" ]]; then sudo kill "$(cat "$work/pid")" || true; fi; sudo userdel "$account" || true; sudo rm -rf "$work"; }
 trap cleanup EXIT
 sudo useradd -M -s /usr/sbin/nologin "$account"
 printf '%s:%s\n' "$account" "$SSH_TEST_PASSWORD" | sudo chpasswd
@@ -32,6 +32,11 @@ sudo /usr/sbin/sshd -f "$work/sshd_config"
 python3 -m venv "$work/wsenv"
 "$work/wsenv/bin/pip" -q install websockets==14.2
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/key.pem" -out "$work/cert.pem" -days 1 -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' 2>/dev/null
+mkdir "$work/badvpn"
+curl -fsSL --retry 3 https://codeload.github.com/ambrop72/badvpn/tar.gz/07268f02706e78e282e19641b5d1d41e8e89bf31 | tar xz --strip-components=1 -C "$work/badvpn"
+cmake -S "$work/badvpn" -B "$work/udpbuild" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_NOTHING_BY_DEFAULT=1 -DBUILD_UDPGW=1
+cmake --build "$work/udpbuild" --target badvpn-udpgw --parallel 2
+"$work/udpbuild/udpgw/badvpn-udpgw" --listen-addr 127.0.0.1:22266 & udpgw_pid=$!
 export XRAY_TEST_DIR="$work"
 export GATEWAY_TEST_CERT="$work/cert.pem"
 "$work/wsenv/bin/python" scripts/test-gateway.py "$work" & gateway_pid=$!

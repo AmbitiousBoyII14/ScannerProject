@@ -48,7 +48,7 @@ class LiveActivity:Activity(){
         enrolling=true
         try{
             val profile=Profile.read(raw,forDiscovery=true);require(profile.isSsh && LiveState.editable())
-            val endpoint=if(profile.mode=="SSH")"${profile.host}:${profile.port}" else profile.label
+            val endpoint=if(profile.mode=="SSH")"${profile.host}:${profile.port}" else profile.label+" · "+java.security.MessageDigest.getInstance("SHA-256").digest((profile.sni+"\n"+profile.path+"\n"+profile.payload).toByteArray()).take(8).joinToString(""){"%02x".format(it)}
             fun save(key:String){
                 try{val j=org.json.JSONObject(raw).put("hostKey",key);LiveState.save(Profile.read(j.toString()));pins.edit().putString(endpoint,key).apply();enrollmentResult("SSH profile selected.",true)}
                 catch(e:Exception){enrollmentResult("Could not save the profile. Stop active connections and check the fields.",false)}
@@ -56,18 +56,25 @@ class LiveActivity:Activity(){
             val existing=pins.getString(endpoint,null)
             if(existing!=null){save(existing);return}
             Thread {
-                try{LiveState.log("KEY","Fetching host key via ${profile.label} before authentication");val (key,fp)=SshTransport.discover(profile.host,profile.port,profile.gateway{t,m->LiveState.log(t,m)})
+                try{LiveState.log("KEY","Fetching host key via ${profile.label} before authentication");val (key,fp)=SshTransport.discover(LiveState.resolve(profile),profile.port,profile.gateway{t,m->LiveState.log(t,m)})
                     runOnUiThread{if(!isFinishing&&!isDestroyed){
                         android.app.AlertDialog.Builder(this).setTitle("Trust this SSH server?")
-                            .setMessage("$endpoint\n\nKey type: ${key.substringBefore(' ')}\nFingerprint: $fp\n\nCompare this fingerprint with your provider before trusting it. No password has been sent.")
+                            .setMessage("${profile.label}\n\nKey type: ${key.substringBefore(' ')}\nFingerprint: $fp\n\nCompare this fingerprint with your provider before trusting it. No password has been sent.")
                             .setPositiveButton("Trust & save"){_,_->save(key)}.setNegativeButton("Cancel"){_,_->enrollmentResult("Server not trusted. No profile saved.",false)}
                             .setOnCancelListener{enrollmentResult("Server not trusted.",false)}.show()
                     }}
-                }catch(e:Exception){runOnUiThread{enrollmentResult("No SSH host key received using ${profile.mode}. Check the endpoint, transport and port. No password was sent.",false)}}
+                }catch(e:Exception){runOnUiThread{enrollmentResult(failureReason(e,"No SSH identification or host key received via ${profile.mode}.")+" No password was sent.",false)}}
             }.start()
         }catch(e:Exception){enrollmentResult("Check the account format, server, port and username. Stop active sessions before saving.",false)}
     }
     inner class Bridge{
+        @JavascriptInterface fun pasteAccount(){runOnUiThread{
+            val clip=getSystemService(android.content.ClipboardManager::class.java).primaryClip
+            val value=clip?.takeIf{it.itemCount>0}?.getItemAt(0)?.text?.toString()?.takeIf{it.length<=16384}
+            if(value!=null)web.evaluateJavascript("receiveAccount("+org.json.JSONObject.quote(value)+")",null) else Toast.makeText(this@LiveActivity,"Clipboard has no account text",Toast.LENGTH_SHORT).show()
+        }}
+        @JavascriptInterface fun selectedAccount()=LiveState.active()?.accountLine().orEmpty()
+        @JavascriptInterface fun validPayload(text:String,binary:Boolean)=runCatching{GatewayRequest.parse(text,"example.test",443,"/",binary);true}.getOrDefault(false)
         @JavascriptInterface fun stopFile(){DebugFile.disable()}
         @JavascriptInterface fun chooseFolder(){runOnUiThread{askForFolder()}}
         @JavascriptInterface fun enrollSsh(raw:String){runOnUiThread{enroll(raw)}}

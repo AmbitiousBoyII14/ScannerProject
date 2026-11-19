@@ -10,8 +10,8 @@ android {
     applicationId = "com.scannervpn.android"
     minSdk = 24
     targetSdk = 36
-    versionCode = 6
-    versionName = "1.5"
+    versionCode = 7
+    versionName = "1.6"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -45,7 +45,7 @@ android {
 }
 
 dependencies {
-  implementation("com.neovisionaries:nv-websocket-client:2.14")
+  implementation("org.java-websocket:Java-WebSocket:1.6.0")
   implementation("com.github.mwiede:jsch:2.28.8")
   implementation(files("libs/libv2ray.aar"))
   testImplementation(libs.junit)

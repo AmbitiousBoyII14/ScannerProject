@@ -16,7 +16,7 @@ import kotlin.concurrent.thread
 
 /** An authenticated, loopback-only SOCKS adapter between the TUN engine and SSH direct-tcpip.
  * No shell, exec, remote listeners, UDP associations, or unverified host keys. */
-internal class SshTransport private constructor(private val session:Session):Closeable {
+internal class SshTransport private constructor(private val session:Session,private val udpGw:String,private val event:(String,String)->Unit):Closeable {
     private val listener=ServerSocket(0,16,InetAddress.getByName("127.0.0.1"))
     val port get()=listener.localPort
     val token=UUID.randomUUID().toString()
@@ -37,7 +37,7 @@ internal class SshTransport private constructor(private val session:Session):Clo
                 return "${key.type} ${key.key}" to key.getFingerPrint(jsch)
             } finally {probe.disconnect()}
         }
-        fun open(ip:String,port:Int,user:String,password:String,hostKey:String,gateway:SshGateway?=null):SshTransport {
+        fun open(ip:String,port:Int,user:String,password:String,hostKey:String,gateway:SshGateway?=null,udpGw:String="",event:(String,String)->Unit={_,_->}):SshTransport {
             val ssh=JSch();val alias="scanner-profile"
             val fields=hostKey.trim().split(Regex("\\s+"));require(fields.size>=2)
             ssh.setKnownHosts("$alias ${fields[0]} ${fields[1]}\n".byteInputStream())
@@ -50,7 +50,7 @@ internal class SshTransport private constructor(private val session:Session):Clo
             session.setConfig("MaxAuthTries","1")
             session.setPassword(password.toByteArray(Charsets.UTF_8))
             session.setServerAliveInterval(15000);session.setServerAliveCountMax(2)
-            try {session.connect(10000);return SshTransport(session).also {it.listen()}}
+            try {session.connect(10000);return SshTransport(session,udpGw,event).also {it.listen()}}
             catch(e:Exception){session.disconnect();throw e}
         }
     }
@@ -83,6 +83,15 @@ internal class SshTransport private constructor(private val session:Session):Clo
         output.write(byteArrayOf(1,0));if(input.readUnsignedByte()!=5)return
         val cmd=input.readUnsignedByte();input.readUnsignedByte()
         fun reply(code:Int)=output.write(byteArrayOf(5,code.toByte(),0,1,0,0,0,0,0,0))
+        if(cmd==3 && udpGw.isNotEmpty()){
+            // Local core requests an unspecified source (RFC 1928); consume and validate it.
+            if(input.readUnsignedByte()!=1 || !bytes(4).contentEquals(ByteArray(4)) || input.readUnsignedShort()!=0){reply(8);return}
+            val ch=session.openChannel("direct-tcpip") as ChannelDirectTCPIP
+            var opened=false
+            try{ch.setHost(udpGw.substringBefore(':'));ch.setPort(udpGw.substringAfter(':').toInt());ch.setOrgIPAddress("127.0.0.1");ch.setOrgPort(socket.port)
+                UdpGateway.serve(socket,ch){port->output.write(byteArrayOf(5,0,0,1,127,0,0,1,(port ushr 8).toByte(),port.toByte()));output.flush();opened=true;event("UDPGW","Forwarding channel to $udpGw opened")}
+            }catch(e:Exception){if(!opened){event("ERROR","Could not open UDP gateway $udpGw on SSH server");reply(5)}}finally{ch.disconnect()};return
+        }
         if(cmd!=1){reply(7);return}
         val dest=when(input.readUnsignedByte()){
             1->InetAddress.getByAddress(bytes(4)).hostAddress
