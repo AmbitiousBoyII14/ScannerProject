@@ -82,6 +82,8 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun choose(key:String)=LiveState.select(key)
         @JavascriptInterface fun checks(all:Boolean)=LiveState.check(applicationContext,all)
         @JavascriptInterface fun checkList(text:String,mode:String)=LiveState.check(applicationContext,true,text,mode)
+        @JavascriptInterface fun connectionPolicy()=CheckPolicy.read(this@LiveActivity).let{obj("seconds" to it.seconds,"auto" to it.auto,"retries" to it.retries).toString()}
+        @JavascriptInterface fun setConnectionPolicy(seconds:Int,auto:Boolean,retries:Int)=runCatching{CheckPolicy(seconds,auto,retries).save(this@LiveActivity)}.getOrDefault(false)
         @JavascriptInterface fun preferences()=org.json.JSONObject().apply {prefKeys.forEach{put(it,prefs.getBoolean(it,defaultValue(it)))}}.toString()
         @JavascriptInterface fun preference(key:String,value:Boolean){if(key in prefKeys){prefs.edit().putBoolean(key,value).apply();runOnUiThread{applySettings()}}}
         @JavascriptInterface fun importBatch(){runOnUiThread{try{startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("text/*"),43)}catch(e:android.content.ActivityNotFoundException){Toast.makeText(this@LiveActivity,"No document picker installed",Toast.LENGTH_SHORT).show()}}}

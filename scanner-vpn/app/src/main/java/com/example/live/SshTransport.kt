@@ -37,7 +37,7 @@ internal class SshTransport private constructor(private val session:Session,priv
                 return "${key.type} ${key.key}" to key.getFingerPrint(jsch)
             } finally {probe.disconnect()}
         }
-        fun open(ip:String,port:Int,user:String,password:String,hostKey:String,gateway:SshGateway?=null,udpGw:String="",verify:((String)->Boolean)?=null,event:(String,String)->Unit={_,_->}):SshTransport {
+        fun open(ip:String,port:Int,user:String,password:String,hostKey:String,gateway:SshGateway?=null,udpGw:String="",verify:((String)->Boolean)?=null,timeout:Int=10000,event:(String,String)->Unit={_,_->}):SshTransport {
             val ssh=JSch();val alias="scanner-profile"
             val session=ssh.getSession(user,ip,port)
             if(gateway!=null)session.setProxy(gateway)
@@ -60,7 +60,7 @@ internal class SshTransport private constructor(private val session:Session,priv
             session.setConfig("MaxAuthTries","1")
             session.setPassword(password.toByteArray(Charsets.UTF_8))
             session.setServerAliveInterval(15000);session.setServerAliveCountMax(2)
-            try {session.connect(10000);return SshTransport(session,udpGw,event).also {it.listen()}}
+            try {session.connect(timeout);return SshTransport(session,udpGw,event).also {it.listen()}}
             catch(e:Exception){session.disconnect();throw e}
         }
     }

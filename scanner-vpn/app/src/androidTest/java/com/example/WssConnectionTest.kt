@@ -38,6 +38,15 @@ class WssConnectionTest {
         ctx.getSharedPreferences("debug_storage",0).edit().putBoolean("disabled",true).commit()
         val activity=inst.startActivitySync(Intent(ctx,LiveActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as LiveActivity
         try{
+            // Reachability checks are independent of any saved login or running VPN.
+            val bridge=activity.Bridge();val oldPolicy=CheckPolicy.read(ctx)
+            try{
+                assertTrue(bridge.setConnectionPolicy(4,true,1));assertEquals(CheckPolicy(4,true,1),CheckPolicy.read(ctx))
+                assertTrue(bridge.checkList("localhost:22267\n127.0.0.1:1","SSH WS TLS"))
+                for(n in 0..160){if(!LiveState.batchRunning)break;Thread.sleep(100)}
+                val batch=JSONObject(bridge.snapshot());assertEquals(2,batch.getInt("completed"));val rows=batch.getJSONArray("results")
+                assertTrue(rows.toString(),rows.getString(0).startsWith("REACHABLE"));assertTrue(rows.getString(1).startsWith("FAILED"));assertTrue(batch.getJSONArray("checks").toString().contains("retry 1 of 1"))
+            }finally{oldPolicy.save(ctx)}
             assertNull("Emulator VPN consent",VpnService.prepare(activity));LiveState.save(p)
             val id="${p.host}:${p.port}";val pins=ctx.getSharedPreferences("known_ssh_servers",0);HostPins.forget(ctx,id)
             fun tapTrust(title:String,button:String){

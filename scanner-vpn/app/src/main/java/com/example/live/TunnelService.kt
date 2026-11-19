@@ -26,15 +26,16 @@ class TunnelService:VpnService(){
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(intent?.action=="stop"){stopTunnel();return START_NOT_STICKY};if(intent?.action!="connect"||LiveState.status!="Starting"){if(core==null)stopSelf();return START_NOT_STICKY}
         startForeground(73,notice("Starting tunnel…"));val p=LiveState.active()?:run{stopTunnel();return START_NOT_STICKY}
-        worker.execute{try{
-            Engine.init(this);val ip=LiveState.resolve(p);ssh=p.openSsh(ip,HostPins.verifier(this,p){!stopping}){t,m->LiveState.log(t,m)};ssh?.report{tag,msg->LiveState.log(tag,msg)};val cfg=p.config(ip,ssh);if(stopping)return@execute
+        val policy=CheckPolicy.read(this)
+        worker.execute{try{policy.run({stopping},{n->cleanup();LiveState.log("RETRY","Network failure · retry $n of ${policy.retries}")}){
+            Engine.init(this);val ip=LiveState.resolve(p,policy.ms);ssh=p.openSsh(ip,HostPins.verifier(this,p){!stopping},policy.ms){t,m->LiveState.log(t,m)};ssh?.report{tag,msg->LiveState.log(tag,msg)};val cfg=p.config(ip,ssh,policy.seconds);if(stopping)return@run
             LiveState.log("VPN","Installing default IPv4 route · DNS ${p.dns}");tun=Builder().setSession("Scanner VPN").setMtu(1500).addAddress("10.77.0.2",30).addRoute("0.0.0.0",0).addDnsServer(p.dns).apply{if(p.dns2.isNotEmpty()&&p.dns2!=p.dns)addDnsServer(p.dns2)}.addDisallowedApplication(packageName).establish()?:error("Permission revoked")
             val engine=Libv2ray.newCoreController(object:CoreCallbackHandler{override fun startup()=0L;override fun shutdown()=0L;override fun onEmitStatus(code:Long,msg:String?)=0L});core=engine
-            engine.startLoop(cfg,tun!!.fd);LiveState.log("TUN","Android interface active; checking outbound through ${p.host}:${p.port}");if(stopping)return@execute
-            LiveState.ms=engine.measureDelay(healthUrl).also{check(it>=0)};if(stopping)return@execute
+            engine.startLoop(cfg,tun!!.fd);LiveState.log("TUN","Android interface active; checking outbound through ${p.host}:${p.port}");if(stopping)return@run
+            LiveState.ms=engine.measureDelay(healthUrl).also{check(it>=0)};if(stopping)return@run
             LiveState.status="Connected";LiveState.since=SystemClock.elapsedRealtime();lastSample=LiveState.since;lastHealth=lastSample
-            LiveState.log("ONLINE","Verified ${p.label} · ${LiveState.ms} ms");getSystemService(NotificationManager::class.java).notify(73,notice("Connected · ${p.host}"));worker.scheduleWithFixedDelay({sample()},1,1,TimeUnit.SECONDS)
-        }catch(e:Exception){if(!stopping)fail(e)}};return START_NOT_STICKY
+            LiveState.log("ONLINE","Verified ${p.label} · ${LiveState.ms} ms");getSystemService(NotificationManager::class.java).notify(73,notice("Connected · ${p.host}"));worker.scheduleWithFixedDelay({sample()},1,1,TimeUnit.SECONDS);Unit
+        }}catch(e:Exception){if(!stopping)fail(e)}};return START_NOT_STICKY
     }
     private fun sample(){if(stopping)return;val engine=core?:return;try{val now=SystemClock.elapsedRealtime();val scale=1.0/(now-lastSample).coerceAtLeast(1);lastSample=now;var up=0.0;var down=0.0;engine.queryAllOutboundTrafficStats().split(';').forEach{val f=it.split(',');if(f.size==3&&f[0]=="vpn"){val v=(f[2].toLongOrNull()?:0)*scale;if(f[1]=="uplink")up+=v else if(f[1]=="downlink")down+=v}};LiveState.up=up;LiveState.down=down;if(now-lastHealth>=60000){lastHealth=now;LiveState.ms=engine.measureDelay(healthUrl).also{check(it>=0)}}}catch(e:Exception){if(!stopping)fail(e)}}
     private fun fail(e:Exception){stopping=true;LiveState.log("ERROR",failureReason(e,"Could not verify HTTPS through this profile. Confirm the server supports the selected protocol and the check site is reachable."));cleanup();LiveState.status="Failed";stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()}

@@ -23,7 +23,7 @@ internal class Profile(val mode:String,val host:String,val port:Int,private val 
     val label get()="$mode · $host:$port"
     val isSsh get()=mode.startsWith("SSH")
     fun gateway(log:(String,String)->Unit)=if(isSsh&&mode!="SSH")SshGateway(sni.ifBlank{host},mode.endsWith("TLS"),if(" WS" in mode||" HTTP" in mode) GatewayRequest.parse(payload,sni.ifBlank{host},port,path," WS" in mode) else null," WS" in mode,"WS+Raw" in mode,log) else null
-    fun openSsh(ip:String,verify:((String)->Boolean)?=null,log:(String,String)->Unit={_,_->}):SshTransport? {
+    fun openSsh(ip:String,verify:((String)->Boolean)?=null,timeout:Int=10000,log:(String,String)->Unit={_,_->}):SshTransport? {
         if(!isSsh){
             log("OUTBOUND","${mode.substringBefore(' ')} · $host:$port · using Xray")
             log("CONFIG",if(" WS" in mode) "WebSocket transport selected" else "TCP transport selected")
@@ -31,15 +31,15 @@ internal class Profile(val mode:String,val host:String,val port:Int,private val 
             return null
         }
         log("SSH","Opening $mode session to $host:$port; verifying pinned host key")
-        return SshTransport.open(ip,port,user,secret,hostKey,gateway(log),udpGw,verify,log)
+        return SshTransport.open(ip,port,user,secret,hostKey,gateway(log),udpGw,verify,timeout,log)
     }
-    fun config(address:String,ssh:SshTransport?=null):String {
+    fun config(address:String,ssh:SshTransport?=null,seconds:Int=10):String {
         val type=if(mode.startsWith("VLESS"))"vless" else if(mode=="Trojan TLS")"trojan" else when(mode){"VMess WS TLS"->"vmess";"SOCKS5 TLS"->"socks";"HTTP CONNECT TLS"->"http";else->"shadowsocks"}
         val node=obj("address" to address,"port" to port)
         val settings=if(type=="vless"){node.put("users",arr(obj("id" to secret,"encryption" to "none")));obj("vnext" to arr(node))}else if(type=="vmess"){node.put("users",arr(obj("id" to secret,"security" to "auto")));obj("vnext" to arr(node))}else if(type=="socks"||type=="http"){node.put("users",arr(obj("user" to user,"pass" to secret)));obj("servers" to arr(node))}else{node.put("password",secret);if(type=="shadowsocks")node.put("method","chacha20-ietf-poly1305");obj("servers" to arr(node))}
         val out=if(isSsh){requireNotNull(ssh);obj("tag" to "vpn","protocol" to "socks","settings" to obj("address" to "127.0.0.1","port" to ssh.port,"user" to "vpn","pass" to ssh.token))}else obj("tag" to "vpn","protocol" to type,"settings" to settings)
         if(type!="shadowsocks"){val ws=mode.endsWith("WS TLS");val stream=obj("network" to if(ws)"ws" else "tcp","security" to "tls","tlsSettings" to obj("serverName" to sni.ifBlank{host}));if(ws)stream.put("wsSettings",obj("path" to path,"host" to host));out.put("streamSettings",stream)}
-        val config=obj("log" to obj("loglevel" to "none"),"stats" to obj(),"policy" to obj("system" to obj("statsOutboundUplink" to true,"statsOutboundDownlink" to true)),"inbounds" to arr(obj("protocol" to "tun","settings" to obj("name" to "scanner0","mtu" to 1500))),"outbounds" to arr(out))
+        val config=obj("log" to obj("loglevel" to "none"),"stats" to obj(),"policy" to obj("levels" to obj("0" to obj("handshake" to seconds)),"system" to obj("statsOutboundUplink" to true,"statsOutboundDownlink" to true)),"inbounds" to arr(obj("protocol" to "tun","settings" to obj("name" to "scanner0","mtu" to 1500))),"outbounds" to arr(out))
         if(isSsh){
             // SSH forwards TCP only. Translate Android resolver UDP into TCP DNS via the same SSH channel.
             config.getJSONArray("outbounds").put(obj("tag" to "resolver","protocol" to "dns","streamSettings" to obj("sockopt" to obj("dialerProxy" to "vpn")),"settings" to obj("rewriteNetwork" to "tcp","rules" to arr(obj("action" to "direct")))))
