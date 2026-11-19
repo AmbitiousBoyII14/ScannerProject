@@ -16,6 +16,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - run: scanner-vpn/scripts/fetch-core.sh
       - run: ./gradlew :app:assembleDebug --no-daemon
         working-directory: scanner-vpn
       - run: cp scanner-vpn/app/build/outputs/apk/debug/app-debug.apk Scanner-VPN-preview.apk
@@ -39,4 +40,4 @@ jobs:
         run: |
           gh release create "scanner-vpn-preview-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" Scanner-VPN-preview.apk \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-            --title 'Scanner VPN Android preview' --notes 'Debug-signed UI preview. SSH authentication is not implemented.'
+            --title 'Scanner VPN Android client' --notes 'Debug-signed native VPN client. Requires your own compatible VPN server. See scanner-vpn/README.md for supported profiles.'

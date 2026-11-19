@@ -24,3 +24,4 @@ my-upload-key.jks
 
 # Internal AI Studio build files
 .aistudio/
+/app/libs/

@@ -1,22 +1,11 @@
-# Scanner VPN — Android source preview
+# Scanner VPN · Native client
 
-Open this directory (the one containing `settings.gradle.kts`) in Android Studio. This is a standalone Kotlin/Jetpack Compose project; it is not a module of ScannerProject.
+The launcher is `com.example.live.LiveActivity`. Its bundled, network-disabled web UI uses the same visual design as the preview, but uses a native bridge instead of simulation code. `TunnelService` creates an Android TUN and passes its descriptor to AndroidLibXrayLite. IPv4 (including DNS) routes through the configured server. IPv6 is not enabled on the interface (Android blocks that family). The app UID is excluded to prevent the transport from routing into itself. This is not an always-on kill switch.
 
-## Build a debug APK
+**Profiles:** VLESS over TCP/TLS or WebSocket/TLS, Trojan/TLS and Shadowsocks (chacha20-ietf-poly1305). TLS uses the actual server name; no certificate verification overrides. No SSH, PHP, or arbitrary payload transport is advertised. Use your own compatible endpoint. Select Configuration, enter the server settings privately, save, then connect and grant Android VPN permission. Up to 12 session-only profiles; no credentials written to preferences, reports, notifications or logs.
 
-Use JDK 17 and the Android SDK with platform 36.1. Allow Gradle to download dependencies from Google and Maven Central. From this directory run:
+The scanner verifies saved profiles, not unknown targets. Health checks request `https://connectivitycheck.gstatic.com/generate_204` using the selected Xray outbound. Failure may mean the check destination is unreachable, not that a server is dead. ONLINE indicates successful HTTPS through the outbound, not independent confirmation of a specific exit IP. Rates are calculated from native outbound counters. The running tunnel repeats its check about once per minute. Stopping a batch allows the current bounded request to finish.
 
-```sh
-./gradlew :app:assembleDebug
-```
+**Build:** JDK 17, Android SDK 36.1. Run `./scripts/fetch-core.sh` (verified SHA-256) and `./gradlew :app:assembleDebug`. The CI workflow publishes a debug-signed prerelease APK. If installing over a preview signed by a different CI debug key, Android may require uninstalling the old preview first.
 
-On Windows use `gradlew.bat :app:assembleDebug`. The output is `app/build/outputs/apk/debug/app-debug.apk`. The debug build uses Android's standard debug signing; no private keystore or API token is required. Run the `app` configuration on Android 7.0+ to preview the UI.
-
-## What this preview contains
-
-- Dashboard, server list, profile and HTTP payload editors, configuration import/export, history and settings under `app/src/main/java/com/example/`.
-- The upstream Android VPN service source under `vpn/`. Its SSH-labelled modes do **not** implement an authenticated SSH transport. Preview the UI without connecting or entering real credentials. The bundled profiles are examples, not Scanner-operated servers.
-
-## Origin and changes
-
-Based on [Dark Tunnel VPN Pro v1.0.0](https://github.com/rodro1926-jpg/dark-tunnel-vpn-pro/tree/eb502b28d683bee2864e7100e78e239d756b3ab0), distributed under the included [Apache license](LICENSE). This fork changes the application ID, launcher and dashboard labels and Gradle setup for local debug builds. It does not include the upstream release workflow or signing configuration.
+Native dependency: [AndroidLibXrayLite v26.11.9](https://github.com/2dust/AndroidLibXrayLite/tree/v26.11.9), including [Xray-core](https://github.com/XTLS/Xray-core/tree/676eaf66f8f0). Corresponding source, build instructions and module revisions are in those repositories. License texts are included in the app assets. Original Dark Tunnel fork is Apache-licensed (see LICENSE); legacy preview components are not registered as Android services or activities.

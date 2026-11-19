@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -19,7 +19,7 @@
         android:theme="@style/Theme.MyApplication">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".live.LiveActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:label="@string/app_name"
@@ -31,7 +31,7 @@
         </activity>
 
         <service
-            android:name=".vpn.DarkTunnelVpnService"
+            android:name=".live.TunnelService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:exported="false"
             android:foregroundServiceType="specialUse">
