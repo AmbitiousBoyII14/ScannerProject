@@ -9,7 +9,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 @contextlib.contextmanager
 def core(name,cfg,port):
-    path=work/(name+'.json');path.write_text(json.dumps(cfg));proc=subprocess.Popen([work/'xray','run','-c',path],env={**os.environ,'SSL_CERT_FILE':str(work/'cert.pem')},stdout=subprocess.DEVNULL)
+    path=work/(name+'.json');path.write_text(json.dumps(cfg));proc=subprocess.Popen([work/'xray','run','-c',path],env={**os.environ,'SSL_CERT_FILE':str(work/'cert.pem')},stderr=subprocess.STDOUT)
     try:
         for _ in range(100):
             if proc.poll() is not None:raise RuntimeError('Fixture exited: '+name)

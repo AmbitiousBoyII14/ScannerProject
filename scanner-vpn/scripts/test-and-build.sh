@@ -53,4 +53,8 @@ fi
 curl -fsSL --retry 3 https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-linux-64.zip -o "$work/xray.zip"
 echo "b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82  $work/xray.zip" | sha256sum -c -
 unzip -q "$work/xray.zip" xray -d "$work"; chmod +x "$work/xray"
-python3 scripts/test-vless.py "$work"
+if ! python3 scripts/test-vless.py "$work" > "$work/vless.log" 2>&1; then
+  tail -18 "$work/vless.log" | while IFS= read -r line; do echo "::error::$line"; done
+  exit 1
+fi
+cat "$work/vless.log"
