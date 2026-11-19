@@ -29,6 +29,10 @@ with http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler) as dest:
         stream={'network':transport,'security':'tls','tlsSettings':{'certificates':[{'certificateFile':str(work/'cert.pem'),'keyFile':str(work/'key.pem')}]}}
         if transport=='ws':stream['wsSettings']={'path':'/fixture'}
         server={'inbounds':[{'listen':'127.0.0.1','port':serverport,'protocol':'vless','streamSettings':stream,'settings':{'decryption':'none','clients':[{'id':'00000000-0000-4000-8000-000000000001'}]}}],'outbounds':[{'protocol':'freedom'}]}
+        # This release blocks private destinations on a VLESS server by default. Permit only
+        # our ephemeral HTTP proof socket; all other destinations remain blocked.
+        server['outbounds'][0]['settings']={'finalRules':[{'action':'allow','network':'tcp','ip':['127.0.0.1/32'],'port':str(dest.server_port)},{'action':'block'}]}
+        for cfg in [client,server]:cfg['log']={'loglevel':'debug'}
         client['inbounds']=[{'listen':'127.0.0.1','port':22265,'protocol':'socks','settings':{'auth':'noauth'}}]
         with core('server',server,serverport),core('client',client,22265):
             output=subprocess.check_output(['curl','--fail','--silent','--show-error','--max-time','8','--noproxy','','--proxy','socks5h://127.0.0.1:22265',f'http://127.0.0.1:{dest.server_port}/proof'])
