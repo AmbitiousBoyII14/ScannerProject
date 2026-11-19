@@ -7,6 +7,8 @@ pluginManagement {
         includeGroupByRegex("androidx.*")
       }
     }
+    // Google-hosted Central mirror avoids shared CI runner Maven Central rate limits.
+    maven("https://maven-central.storage-download.googleapis.com/maven2/")
     mavenCentral()
     gradlePluginPortal()
   }
@@ -18,6 +20,8 @@ dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
   repositories {
     google()
+    // Google-hosted Central mirror avoids shared CI runner Maven Central rate limits.
+    maven("https://maven-central.storage-download.googleapis.com/maven2/")
     mavenCentral()
   }
 }
