@@ -58,6 +58,9 @@ class WssConnectionTest {
                 val pinId="localhost:22260";HostPins.forget(ctx,pinId)
                 try {
                     assertTrue(bridge.checkSshAliases(sshTpl,"localhost").contains("verify its SSH key"))
+                    ctx.getSharedPreferences("known_ssh_servers",0).edit().putString(pinId,j.getString("otherKey").split(' ').take(2).joinToString(" ")).commit()
+                    assertEquals("",bridge.checkSshAliases(sshTpl,"localhost"));for(n in 0..150){if(!LiveState.batchRunning)break;Thread.sleep(100)}
+                    assertTrue(JSONObject(bridge.snapshot()).getJSONArray("results").getString(0).startsWith("FAILED"));assertTrue(HostPins.canonicalPin(ctx,pinId)!!.endsWith(j.getString("otherKey").split(' ')[1]))
                     ctx.getSharedPreferences("known_ssh_servers",0).edit().putString(pinId,j.getString("hostKey").split(' ').take(2).joinToString(" ")).commit()
                     assertEquals("",bridge.checkSshAliases(sshTpl,"outside.example\nlocalhost"))
                     for(n in 0..200){if(!LiveState.batchRunning)break;Thread.sleep(100)}
