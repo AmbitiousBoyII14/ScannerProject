@@ -54,7 +54,7 @@ internal object LiveState {
                     val row=t.approved(host,names);if(row==null){skipped++;result("Skipped",host,"Not an explicit gateway certificate name (SNI / WS Host / list entry).");continue}
                     var attempt=0
                     try{val delay=policy.run({stopBatch},{},{attempt++;val eta=if(completed==0)"estimating" else "${(SystemClock.elapsedRealtime()-start)/1000*(total-completed)/completed}s";aliasStatus="${completed+1}/$total · $host · attempt $attempt/3 · Connected $connected · Failed $failed · ETA $eta";log("ATTEMPT","$host · $attempt/3",true)
-                        val ms=Libv2ray.measureOutboundDelay(row.config(ip.hostAddress!!,seconds=policy.seconds),CHECK_URL);check(ms>=0);ms});if(stopBatch)break;connected++;result("Connected",host,"HTTPS through ${row.mode} · $delay ms · $edge")
+                        val ms=try{Libv2ray.measureOutboundDelay(row.config(ip.hostAddress!!,seconds=policy.seconds),CHECK_URL)}catch(e:Exception){throw aliasFailure(e)};check(ms>=0);ms});if(stopBatch)break;connected++;result("Connected",host,"HTTPS through ${row.mode} · $delay ms · $edge")
                     }catch(e:Exception){if(stopBatch)break;failed++;result("Failed",host,failureReason(e,"V2ray outbound did not verify traffic.")+" · $edge")}
                 }
                 val summary="${if(stopBatch)"Stopped" else "Complete"} · $completed/$total · Connected $connected · Failed $failed · Skipped $skipped"

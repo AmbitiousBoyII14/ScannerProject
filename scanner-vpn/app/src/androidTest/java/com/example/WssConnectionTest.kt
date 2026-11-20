@@ -47,6 +47,12 @@ class WssConnectionTest {
                 for(n in 0..160){if(!LiveState.batchRunning)break;Thread.sleep(100)}
                 val batch=JSONObject(bridge.snapshot());assertTrue(batch.getJSONArray("results").getString(0).contains("Non-CDN"));assertEquals(2,batch.getInt("completed"));val rows=batch.getJSONArray("results")
                 assertTrue(rows.toString(),rows.getString(0).startsWith("REACHABLE"));assertTrue(rows.getString(1).startsWith("FAILED"));assertTrue(batch.getJSONArray("checks").toString().contains("retry 1 of 1"))
+                // Fixed loopback TLS server has localhost in its SAN, not outside.example.
+                val tpl=obj("mode" to "VLESS WS TLS","host" to "localhost","port" to 22267,"secret" to "00000000-0000-4000-8000-000000000001","sni" to "\$\$","wsHost" to "\$\$","path" to "/missing").toString()
+                assertEquals("",bridge.checkAliases(tpl,"outside.example\nlocalhost"))
+                for(n in 0..250){if(!LiveState.batchRunning)break;Thread.sleep(100)}
+                val result=JSONObject(bridge.snapshot());assertEquals(result.optString("aliasStatus"),2,result.getInt("completed"));val aliasRows=result.getJSONArray("results")
+                assertTrue(aliasRows.getString(0).startsWith("SKIPPED"));assertTrue(aliasRows.getString(1).startsWith("FAILED"));assertTrue(java.io.File(ctx.filesDir,"output.txt").readText().contains("[Skipped]"))
             }finally{oldPolicy.save(ctx)}
             assertNull("Emulator VPN consent",VpnService.prepare(activity));LiveState.save(p)
             val id="${p.host}:${p.port}";val pins=ctx.getSharedPreferences("known_ssh_servers",0);HostPins.forget(ctx,id)

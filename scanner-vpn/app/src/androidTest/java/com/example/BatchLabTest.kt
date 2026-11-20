@@ -26,7 +26,7 @@ class BatchLabTest {
             inst.runOnMainSync { find(activity.window.decorView)!!.evaluateJavascript(code){q.offer(it?:"null")} }
             return requireNotNull(q.poll(4,TimeUnit.SECONDS))
         }
-        fun wait(activity:Activity,condition:String){repeat(120){if(js(activity,condition)=="true")return;Thread.sleep(100)};fail(condition)}
+        fun wait(activity:Activity,condition:String){repeat(120){if(js(activity,condition)=="true")return;Thread.sleep(100)};fail(condition+"; state="+js(activity,"JSON.stringify([document.title,document.readyState,typeof preview,document.getElementById('notice')?.textContent,document.getElementById('count')?.textContent])"))}
         val monitor=inst.addMonitor(BatchLabActivity::class.java.name,null,false)
         var lab:Activity?=null
         try {
