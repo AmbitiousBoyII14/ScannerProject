@@ -53,6 +53,16 @@ class WssConnectionTest {
                 for(n in 0..250){if(!LiveState.batchRunning)break;Thread.sleep(100)}
                 val result=JSONObject(bridge.snapshot());assertEquals(result.optString("aliasStatus"),2,result.getInt("completed"));val aliasRows=result.getJSONArray("results")
                 assertTrue(aliasRows.getString(0).startsWith("SKIPPED"));assertTrue(aliasRows.getString(1).startsWith("FAILED"));assertTrue(java.io.File(ctx.filesDir,"output.txt").readText().contains("[Skipped]"))
+                // SSH account marker: no key = no batch; already trusted server = real SSH forwarding.
+                val sshTpl=JSONObject(j.toString()).put("host","\$\$").put("mode","SSH TLS").put("port",22260).put("sni","localhost").put("payload","").toString()
+                val pinId="localhost:22260";HostPins.forget(ctx,pinId)
+                try {
+                    assertTrue(bridge.checkSshAliases(sshTpl,"localhost").contains("verify its SSH key"))
+                    ctx.getSharedPreferences("known_ssh_servers",0).edit().putString(pinId,j.getString("hostKey").split(' ').take(2).joinToString(" ")).commit()
+                    assertEquals("",bridge.checkSshAliases(sshTpl,"outside.example\nlocalhost"))
+                    for(n in 0..200){if(!LiveState.batchRunning)break;Thread.sleep(100)}
+                    val snap=JSONObject(bridge.snapshot());val lines=snap.getJSONArray("results");assertEquals(snap.optString("aliasStatus"),2,lines.length());assertTrue(lines.getString(0).startsWith("SKIPPED"));assertTrue(lines.getString(1),lines.getString(1).startsWith("CONNECTED"));assertFalse(java.io.File(ctx.filesDir,"output.txt").readText().contains(j.getString("secret")))
+                } finally {HostPins.forget(ctx,pinId)}
             }finally{oldPolicy.save(ctx)}
             assertNull("Emulator VPN consent",VpnService.prepare(activity));LiveState.save(p)
             val id="${p.host}:${p.port}";val pins=ctx.getSharedPreferences("known_ssh_servers",0);HostPins.forget(ctx,id)

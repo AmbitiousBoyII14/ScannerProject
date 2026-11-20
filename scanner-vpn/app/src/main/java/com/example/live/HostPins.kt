@@ -22,6 +22,9 @@ internal object HostPins {
         val blob=Base64.decode(key.split(' ')[1],Base64.DEFAULT)
         return "SHA256:"+Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(blob),Base64.NO_WRAP or Base64.NO_PADDING)
     }
+    @Synchronized fun canonicalPin(ctx:Context,id:String):String? {
+        val saved=entries(ctx,id);return saved[id]?.takeIf{saved.keys==setOf(id)}
+    }
     @Synchronized fun forget(ctx:Context,id:String):Boolean {
         val edit=prefs(ctx).edit();entries(ctx,id).keys.forEach(edit::remove);return edit.commit()
     }

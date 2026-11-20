@@ -75,6 +75,7 @@ PYFIX
 { printf 'GET /proof HTTP/1.0\r\nHost: fixture\r\n\r\n'; sleep 1; } | toybox timeout 8 toybox nc -w 4 192.0.2.148 22269
 PROBE
   adb push "$work/scanner-proof.sh" /data/local/tmp/scanner-proof.sh
+  adb reverse tcp:22260 tcp:22260
   adb reverse tcp:22267 tcp:22267
   ./gradlew :app:connectedDebugAndroidTest --no-daemon --console=plain
   python3 - <<'PYCHECK'

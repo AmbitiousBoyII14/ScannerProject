@@ -7,10 +7,15 @@ import javax.net.ssl.*
 import org.json.JSONObject
 
 /** One fixed TLS endpoint. The list is never used as a dial address or a source of credentials. */
-internal class CoreAliasTemplate(raw:String) {
+internal interface AliasTemplate {
+    val base:Profile
+    fun approved(alias:String,certNames:Set<String>):Profile?
+}
+
+internal class CoreAliasTemplate(raw:String) : AliasTemplate {
     private val draft=JSONObject(raw)
     private val fields=listOf("sni","wsHost","path")
-    val base:Profile
+    override val base:Profile
     init {
         require(raw.length<=32768 && fields.any{draft.optString(it).contains("\$\$")})
         require(draft.keys().asSequence().none{it !in fields && draft.optString(it).contains("\$\$")})
@@ -20,11 +25,26 @@ internal class CoreAliasTemplate(raw:String) {
     private fun expand(name:String):Profile {
         val row=JSONObject(draft.toString());for(k in fields)if(row.has(k))row.put(k,row.getString(k).replace("\$\$",name));return Profile.read(row.toString())
     }
-    fun approved(alias:String,certNames:Set<String>):Profile? {
+    override fun approved(alias:String,certNames:Set<String>):Profile? {
         if(alias !in certNames)return null
         val row=try{expand(alias)}catch(_:IllegalArgumentException){return null};return row.takeIf{it.sni.ifEmpty{it.host} in certNames && (" WS " !in it.mode || it.wsHost.ifEmpty{it.host} in certNames)}
     }
-    fun certificateNames(ip:InetAddress,ms:Int):Set<String> = Socket().use { tcp ->
+}
+
+/** Only the account hostname changes. Pin comes from the canonical SNI's existing trust record. */
+internal class SshAccountTemplate(raw:String,pin:String) : AliasTemplate {
+    private val draft=JSONObject(raw)
+    override val base:Profile
+    init {
+        require(raw.length<=32768 && draft.getString("host")=="\$\$" && draft.getString("mode")=="SSH TLS")
+        val sni=draft.getString("sni");require(sni.isNotBlank())
+        draft.put("hostKey",pin);base=profile(sni)
+    }
+    private fun profile(host:String)=Profile.read(JSONObject(draft.toString()).put("host",host).toString())
+    override fun approved(alias:String,certNames:Set<String>):Profile? = if(alias in certNames)profile(alias) else null
+}
+
+internal fun AliasTemplate.certificateNames(ip:InetAddress,ms:Int):Set<String> = Socket().use { tcp ->
         tcp.connect(InetSocketAddress(ip,base.port),ms);tcp.soTimeout=ms
         ((SSLSocketFactory.getDefault() as SSLSocketFactory).createSocket(tcp,base.host,base.port,true) as SSLSocket).use { tls ->
             tls.sslParameters=tls.sslParameters.apply{endpointIdentificationAlgorithm="HTTPS"};tls.startHandshake()
@@ -33,7 +53,6 @@ internal class CoreAliasTemplate(raw:String) {
             cert.subjectAlternativeNames.orEmpty().filter{it.first()==2 || it.first()==7}.mapNotNull{it.getOrNull(1) as? String}.filterNot{it.contains('*')}.map{it.lowercase()}.toSet()
         }
     }
-}
 
 // gomobile may surface a Go network timeout as a generic Exception. Normalize only
 // transient network errors; never retry an explicit TLS, authentication or HTTP refusal.

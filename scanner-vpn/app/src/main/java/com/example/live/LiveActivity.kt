@@ -99,6 +99,7 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun choose(key:String)=LiveState.select(key)
         @JavascriptInterface fun checks(all:Boolean)=LiveState.check(applicationContext,all)
         @JavascriptInterface fun openLab(){runOnUiThread{startActivity(Intent(this@LiveActivity,BatchLabActivity::class.java))}}
+        @JavascriptInterface fun checkSshAliases(raw:String,text:String)=LiveState.sshAliases(applicationContext,raw,text)
         @JavascriptInterface fun checkAliases(raw:String,text:String)=LiveState.aliases(applicationContext,raw,text)
         @JavascriptInterface fun validAliasTemplate(raw:String)=runCatching{CoreAliasTemplate(raw);true}.getOrDefault(false)
         @JavascriptInterface fun checkWebsites(text:String,template:String)=LiveState.websites(applicationContext,text,template)
