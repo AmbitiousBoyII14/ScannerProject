@@ -62,10 +62,17 @@ class AccountFlowTest {
             js("location.reload()");until("typeof receiveAccount==='function' && document.getElementById('account').value.endsWith('example.test/password')");drawer("SSH Settings");until("document.getElementById('remember').checked");js("document.getElementById('remember').click()");until("Client.rememberedSsh()==='' ")
             // No HTTPS server is bound on the emulator loopback's default port. The direct
             // website check must report a network failure, never reuse the saved SSH login.
-            js("document.querySelector('#back').click();document.querySelector('[data-tab=batch]').click();document.querySelector('#targets').value='127.0.0.1\\ninvalid:123\\n127.0.0.1';document.querySelector('#scan').click()")
+            js("document.querySelector('#back').click()");drawer("Response checker");js("document.querySelector('#targets').value='127.0.0.1\\ninvalid:123\\n127.0.0.1';document.querySelector('#scan').click()")
             until("document.querySelector('#progress').textContent.includes('1/1 completed') && !document.querySelector('#report').hidden")
             assertTrue(js("document.querySelector('#progress').textContent").contains("Skipped 1 invalid"))
             val report=java.io.File(ctx.filesDir,"output.txt").readText();assertTrue(report.contains("[Failed · 1]"));assertFalse(report.contains("example.test/password"))
+            // Import-only Batch returns to the home profile; Connect sends a tagged profile to Log.
+            js("document.querySelector('[data-tab=batch]').click()")
+            assertEquals("1",js("document.querySelectorAll('#batch button').length"))
+            js("receiveBatch('outside.example');document.querySelector('#account').value='\$\$:22267@fixture:example-only';cfg.sshSni='localhost';F().V2ray=false;F().SSL=true;F()['Use Payload']=false;document.querySelector('#connect').click()")
+            until("!document.querySelector('#log').hidden && document.querySelector('#runStatus').textContent.includes('1/1') && !document.querySelector('#batchReport').hidden")
+            assertTrue(js("document.querySelector('#events').textContent").contains("SKIPPED"));assertFalse(js("document.querySelector('#events').textContent").contains("example-only"))
+
 
         }}finally{inst.runOnMainSync{a.finish()}}
     }

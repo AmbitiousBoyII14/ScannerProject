@@ -28,7 +28,7 @@ internal object LiveState {
     @Synchronized fun select(key:String){if(editable() && profiles.containsKey(key))chosen=key}
     @Synchronized fun active()=profiles[chosen]
     fun editable()=status in setOf("Idle","Failed")&&!batchRunning
-    @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=500)list.removeFirst();list.addLast("$stamp  $tag  $text");DebugFile.event("${if(batch) "BATCH" else "VPN"}  $tag  $text")}
+    @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=500)list.removeFirst();val line="$stamp  $tag  $text";list.addLast(line);if(batch && batchRunning && aliasStatus.isNotEmpty()){if(logs.size>=500)logs.removeFirst();logs.addLast(line)};DebugFile.event("${if(batch) "BATCH" else "VPN"}  $tag  $text")}
     @Synchronized fun sessionLogText()=logs.joinToString("\n")
     @Synchronized fun clearSessionLog(){logs.clear()}
     @Synchronized fun snapshot()=obj("aliasKind" to aliasKind,"aliasStatus" to aliasStatus,"webBatch" to (webBatch?.snapshot() ?: org.json.JSONObject.NULL),"debugFile" to DebugFile.status,"state" to status,"activeDns" to (active()?.dns?:""),"activeSni" to (active()?.sni?:""),"activeDns2" to (active()?.dns2?:""),"activeUdp" to (active()?.udpGw?:""),"activePayload" to (active()?.payload?:""),"activePath" to (active()?.path?:"/"),"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"results" to arr(*outcomes.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
@@ -75,7 +75,7 @@ internal object LiveState {
                     }catch(e:Exception){if(stopBatch)break;failed++;result("Failed",host,(if(trustRejected)"SSH key not approved or changed. No password sent." else failureReason(e,"Outbound did not verify traffic."))+" · $edge");if(trustRejected){stopBatch=true;break}}
                 }
                 val summary="${if(stopBatch)"Stopped" else "Complete"} · $completed/$total · Connected $connected · Failed $failed · Skipped $skipped"
-                tmp.outputStream().buffered().use{out->out.write(("${if(ssh)"SSH" else "V2ray"} TLS alias batch · $summary\nGateway: ${t.base.host}:${t.base.port} · $edge\n").toByteArray());parts.forEach{(group,f)->out.write("\n[$group]\n".toByteArray());f.inputStream().use{it.copyTo(out)}}};check(tmp.renameTo(file));aliasStatus="$summary · output.txt saved"
+                tmp.outputStream().buffered().use{out->out.write(("${if(ssh)"SSH" else "V2ray"} TLS alias batch · $summary\nGateway: ${t.base.host}:${t.base.port} · $edge\n").toByteArray());parts.forEach{(group,f)->out.write("\n[$group]\n".toByteArray());f.inputStream().use{it.copyTo(out)}}};check(tmp.renameTo(file));aliasStatus="$summary · output.txt saved";log("BATCH",summary,true)
             }catch(e:Exception){aliasStatus="Batch stopped: "+failureReason(e,"Could not verify the fixed gateway certificate, build a row or save the report.");log("FAILED",aliasStatus,true)}finally{parts.values.forEach{it.delete()};tmp.delete();batchRunning=false}
         };return ""
     }
