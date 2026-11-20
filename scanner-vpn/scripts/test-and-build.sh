@@ -80,7 +80,7 @@ PROBE
   python3 - <<'PYCHECK'
 import glob,xml.etree.ElementTree as ET
 cases=[t for f in glob.glob('app/build/outputs/androidTest-results/**/*.xml',recursive=True) for t in ET.parse(f).iter('testcase')]
-for name in ('rejectedRouteThenAuthenticatedForward','pasteConfigureAndObserveGatewayRefusal'):
+for name in ('rejectedRouteThenAuthenticatedForward','pasteConfigureAndObserveGatewayRefusal','batchLabFromBatchTab'):
     assert any(t.get('name')==name and all(t.find(tag) is None for tag in ['failure','error','skipped']) for t in cases), name+' did not pass'
 PYCHECK
   exit 0

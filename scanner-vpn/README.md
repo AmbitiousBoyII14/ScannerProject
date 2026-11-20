@@ -86,3 +86,7 @@ For the full test suite, use the [build workflow](../.github/workflows/scanner-v
 In **Batch → Website status**, import UTF-8 text with one bare domain per line (up to 1 MiB; no 100-domain cap). Blank lines and duplicates are ignored; invalid lines are counted separately. `https://$$/` checks `/` at each listed domain, or set a fixed path like `/health`. Checks run sequentially using the configured timeout/retry policy. Each uses normal certificate verification, the same hostname for DNS/TLS/HTTP, and no VPN credentials, alternate port, cookies or redirects. **Saved VPN profiles** remains a separate mode.
 
 Connected means an HTTP response arrived, including 404; failed means no valid response. CDN labels describe the resolved IP against the bundled ranges, not the origin. ETA is estimated from completed checks. The live board shows the newest 20 rows per group. Completion or Stop saves all finished rows to app-private `output.txt`; **Export output.txt** copies the latest report to a location you choose. Starting a new run keeps the previous file until the replacement is ready.
+
+### 1.17 · Offline Batch Lab
+
+Choose **Batch → Open Batch Lab · $$ templates**. This screen renders `app/src/main/assets/batch-lab.html`, the same document as the standalone preview. Only text import and report export are bridged to Android's document picker; there is no VPN bridge, network access or saved credential access in the lab. Android Back returns to the batch tab. Live website/profile checks remain separate.

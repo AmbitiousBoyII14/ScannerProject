@@ -98,6 +98,7 @@ class LiveActivity:Activity(){
         @JavascriptInterface fun save(raw:String):Boolean=runCatching{LiveState.save(Profile.read(raw));true}.getOrDefault(false)
         @JavascriptInterface fun choose(key:String)=LiveState.select(key)
         @JavascriptInterface fun checks(all:Boolean)=LiveState.check(applicationContext,all)
+        @JavascriptInterface fun openLab(){runOnUiThread{startActivity(Intent(this@LiveActivity,BatchLabActivity::class.java))}}
         @JavascriptInterface fun checkWebsites(text:String,template:String)=LiveState.websites(applicationContext,text,template)
         @JavascriptInterface fun hasReport()=java.io.File(filesDir,"output.txt").isFile
         @JavascriptInterface fun exportReport(){if(!hasReport())return;runOnUiThread{try{startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("text/plain").putExtra(Intent.EXTRA_TITLE,"output.txt"),49)}catch(_:Exception){toast("No document picker available")}}}
