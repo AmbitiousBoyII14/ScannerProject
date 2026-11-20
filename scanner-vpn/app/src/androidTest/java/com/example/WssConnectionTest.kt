@@ -40,6 +40,15 @@ class WssConnectionTest {
         val activity=inst.startActivitySync(Intent(ctx,LiveActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as LiveActivity
         try{
             // Reachability checks are independent of any saved login or running VPN.
+            fun tapTrust(title:String,button:String){
+                repeat(150){
+                    val root=inst.uiAutomation.rootInActiveWindow
+                    if(root?.findAccessibilityNodeInfosByText(title)?.isNotEmpty()==true){
+                        val node=root.findAccessibilityNodeInfosByText(button).firstOrNull{it.isClickable}
+                        if(node?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true)return
+                    };Thread.sleep(100)
+                };fail("No SSH trust dialog: $title; "+LiveState.sessionLogText().takeLast(420))
+            }
             val bridge=activity.Bridge();val oldPolicy=CheckPolicy.read(ctx)
             try{
                 assertTrue(bridge.setConnectionPolicy(4,true,1));assertEquals(CheckPolicy(4,true,1),CheckPolicy.read(ctx))
@@ -57,27 +66,27 @@ class WssConnectionTest {
                 val sshTpl=JSONObject(j.toString()).put("host","\$\$").put("mode","SSH TLS").put("port",22260).put("sni","localhost").put("payload","").toString()
                 val pinId="localhost:22260";HostPins.forget(ctx,pinId)
                 try {
-                    assertTrue(bridge.checkSshAliases(sshTpl,"localhost").contains("verify its SSH key"))
+                    assertEquals("",bridge.checkSshAliases(sshTpl,"localhost"));tapTrust("Trust SSH host", "Cancel")
+                    for(n in 0..120){if(!LiveState.batchRunning)break;Thread.sleep(100)};assertNull(HostPins.canonicalPin(ctx,pinId))
                     ctx.getSharedPreferences("known_ssh_servers",0).edit().putString(pinId,j.getString("otherKey").split(' ').take(2).joinToString(" ")).commit()
                     assertEquals("",bridge.checkSshAliases(sshTpl,"localhost"));for(n in 0..150){if(!LiveState.batchRunning)break;Thread.sleep(100)}
                     assertTrue(JSONObject(bridge.snapshot()).getJSONArray("results").getString(0).startsWith("FAILED"));assertTrue(HostPins.canonicalPin(ctx,pinId)!!.endsWith(j.getString("otherKey").split(' ')[1]))
-                    ctx.getSharedPreferences("known_ssh_servers",0).edit().putString(pinId,j.getString("hostKey").split(' ').take(2).joinToString(" ")).commit()
-                    assertEquals("",bridge.checkSshAliases(sshTpl,"outside.example\nlocalhost"))
+                    HostPins.forget(ctx,pinId)
+                    assertEquals("",bridge.checkSshAliases(sshTpl,"outside.example\nlocalhost"));tapTrust("Trust SSH host", "Trust key")
                     for(n in 0..200){if(!LiveState.batchRunning)break;Thread.sleep(100)}
                     val snap=JSONObject(bridge.snapshot());val lines=snap.getJSONArray("results");assertEquals(snap.optString("aliasStatus"),2,lines.length());assertTrue(lines.getString(0).startsWith("SKIPPED"));assertTrue(lines.getString(1),lines.getString(1).startsWith("CONNECTED"));assertFalse(java.io.File(ctx.filesDir,"output.txt").readText().contains(j.getString("secret")))
+                    // WebSocket upgrade with $$ in the HTTP Host; no separate normal login.
+                    val wsTpl=JSONObject(sshTpl).put("mode","SSH WS TLS").put("port",22267).put("payload","GET /ssh HTTP/1.1[crlf]Host: \$\$[crlf]Connection: Upgrade[crlf]Upgrade: websocket[crlf]Sec-WebSocket-Protocol: binary").toString()
+                    HostPins.forget(ctx,"localhost:22267")
+                    try {
+                        assertEquals("",bridge.checkSshAliases(wsTpl,"localhost"));tapTrust("Trust SSH host", "Trust key")
+                        for(n in 0..200){if(!LiveState.batchRunning)break;Thread.sleep(100)}
+                        val ws=JSONObject(bridge.snapshot());assertTrue(ws.getJSONArray("results").toString(),ws.getJSONArray("results").getString(0).startsWith("CONNECTED"));assertTrue(ws.getJSONArray("checks").toString().contains("HTTP 101"))
+                    } finally {HostPins.forget(ctx,"localhost:22267")}
                 } finally {HostPins.forget(ctx,pinId)}
             }finally{oldPolicy.save(ctx)}
             assertNull("Emulator VPN consent",VpnService.prepare(activity));LiveState.save(p)
             val id="${p.host}:${p.port}";val pins=ctx.getSharedPreferences("known_ssh_servers",0);HostPins.forget(ctx,id)
-            fun tapTrust(title:String,button:String){
-                repeat(150){
-                    val root=inst.uiAutomation.rootInActiveWindow
-                    if(root?.findAccessibilityNodeInfosByText(title)?.isNotEmpty()==true){
-                        val node=root.findAccessibilityNodeInfosByText(button).firstOrNull{it.isClickable}
-                        if(node?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)==true)return
-                    };Thread.sleep(100)
-                };fail("No SSH trust dialog: $title; "+LiveState.sessionLogText().takeLast(420))
-            }
             activity.Bridge().connect();tapTrust("Trust SSH host", "Cancel")
             for(n in 0..100){if(LiveState.status=="Failed")break;Thread.sleep(100)}
             assertEquals("Failed",LiveState.status);assertFalse(pins.contains(id))

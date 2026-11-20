@@ -42,10 +42,7 @@ internal object LiveState {
     }
     @Synchronized fun sshAliases(context:Context,raw:String,text:String):String {
         if(!editable())return "Stop the current tunnel or batch first."
-        val j=runCatching{org.json.JSONObject(raw)}.getOrElse{return "Invalid SSH account template."}
-        if(j.optString("mode")!="SSH TLS" || j.optString("sni").isBlank() || j.optString("host")!="\$\$")return "Set a fixed SNI, turn on SSL and turn off Use Payload for this SSH account batch."
-        val pin=HostPins.canonicalPin(context,j.optString("sni").trim().lowercase()+":"+j.optInt("port"))?:return "First connect normally with the SNI hostname as the account host and verify its SSH key."
-        val template=runCatching{SshAccountTemplate(raw,pin)}.getOrElse{return "Invalid SSH account, port or SNI."}
+        val template=runCatching{SshAccountTemplate(raw)}.getOrElse{return "Use an SSH-over-TLS profile with a fixed gateway (account host or SNI) and \$\$ in the account host, SNI or payload. Check the GET upgrade payload if enabled."}
         return runAliases(context,template,text)
     }
     private fun runAliases(context:Context,t:AliasTemplate,text:String):String {
@@ -61,16 +58,21 @@ internal object LiveState {
             }
             val tmp=java.io.File(context.filesDir,"alias-output.tmp")
             try{
-                parts.values.forEach{it.writeText("")};val ip=NetworkChecks.resolve(t.base.host,policy.ms);val names=t.certificateNames(ip,policy.ms);val edge="${ip.hostAddress} · ${CdnRanges.label(ip)}"
-                Engine.init(context)
+                parts.values.forEach{it.writeText("")};log("DNS","Resolving gateway ${t.base.host}",true);val ip=NetworkChecks.resolve(t.base.host,policy.ms);val names=t.certificateNames(ip,policy.ms);val edge="${ip.hostAddress} · ${CdnRanges.label(ip)}"
+                log("TLS","Gateway verified · $edge",true);Engine.init(context)
+                var trustRejected=false
                 for(host in input.hosts){if(stopBatch)break
                     val row=t.approved(host,names);if(row==null){skipped++;result("Skipped",host,"Not an explicit gateway certificate name (SNI / WS Host / list entry).");continue}
                     var attempt=0
                     try{val delay=policy.run({stopBatch},{},{attempt++;val eta=if(completed==0)"estimating" else "${(SystemClock.elapsedRealtime()-start)/1000*(total-completed)/completed}s";aliasStatus="${completed+1}/$total · $host · attempt $attempt/3 · Connected $connected · Failed $failed · ETA $eta";log("ATTEMPT","$host · $attempt/3",true)
                         val dial=if(ssh)NetworkChecks.resolve(row.host,policy.ms) else ip
                         if(dial!=ip)throw GatewayFailure("Alias does not resolve to the verified gateway address. No login attempted.")
-                        val ms=try{row.openSsh(dial.hostAddress!!,timeout=policy.ms).use{transport->Libv2ray.measureOutboundDelay(row.config(dial.hostAddress!!,transport,policy.seconds),context.getString(com.example.R.string.vpn_health_url))}}catch(e:Exception){throw aliasFailure(e)};check(ms>=0);ms});if(stopBatch)break;connected++;result("Connected",host,"HTTPS through ${row.mode} · $delay ms · $edge")
-                    }catch(e:Exception){if(stopBatch)break;failed++;result("Failed",host,failureReason(e,"Outbound did not verify traffic.")+" · $edge")}
+                        val verify:((String)->Boolean)?=if(!ssh)null else {key->
+                            log("KEY","Checking SSH identity for ${t.base.host}:${t.base.port}",true)
+                            val approved=HostPins.batchTrust(context,"${t.base.host}:${t.base.port}",key){!stopBatch};if(!approved)trustRejected=true;approved
+                        }
+                        val ms=try{row.openSsh(dial.hostAddress!!,verify,policy.ms){tag,msg->log(tag,msg,true)}.use{transport->if(transport!=null)log("AUTH","SSH authentication completed",true);log("CHECK","Testing traffic through ${row.mode}",true);Libv2ray.measureOutboundDelay(row.config(dial.hostAddress!!,transport,policy.seconds),context.getString(com.example.R.string.vpn_health_url))}}catch(e:Exception){throw aliasFailure(e)};check(ms>=0);ms});if(stopBatch)break;connected++;result("Connected",host,"HTTPS through ${row.mode} · $delay ms · $edge")
+                    }catch(e:Exception){if(stopBatch)break;failed++;result("Failed",host,(if(trustRejected)"SSH key not approved or changed. No password sent." else failureReason(e,"Outbound did not verify traffic."))+" · $edge");if(trustRejected){stopBatch=true;break}}
                 }
                 val summary="${if(stopBatch)"Stopped" else "Complete"} · $completed/$total · Connected $connected · Failed $failed · Skipped $skipped"
                 tmp.outputStream().buffered().use{out->out.write(("${if(ssh)"SSH" else "V2ray"} TLS alias batch · $summary\nGateway: ${t.base.host}:${t.base.port} · $edge\n").toByteArray());parts.forEach{(group,f)->out.write("\n[$group]\n".toByteArray());f.inputStream().use{it.copyTo(out)}}};check(tmp.renameTo(file));aliasStatus="$summary · output.txt saved"

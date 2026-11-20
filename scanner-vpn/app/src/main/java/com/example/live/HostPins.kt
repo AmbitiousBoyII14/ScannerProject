@@ -25,6 +25,14 @@ internal object HostPins {
     @Synchronized fun canonicalPin(ctx:Context,id:String):String? {
         val saved=entries(ctx,id);return saved[id]?.takeIf{saved.keys==setOf(id)}
     }
+    /** First-use confirmation is allowed in batch; replacement of any prior key is not. */
+    fun batchTrust(ctx:Context,id:String,key:String,active:()->Boolean):Boolean {
+        val before=synchronized(this){entries(ctx,id)}
+        if(!active())return false
+        if(before.isNotEmpty())return before.values.all{it.split(' ').take(2).joinToString(" ")==key}
+        if(!confirm(id,emptyList(),key,active))return false
+        return synchronized(this){active() && entries(ctx,id).isEmpty() && prefs(ctx).edit().putString(id,key).commit()}
+    }
     @Synchronized fun forget(ctx:Context,id:String):Boolean {
         val edit=prefs(ctx).edit();entries(ctx,id).keys.forEach(edit::remove);return edit.commit()
     }

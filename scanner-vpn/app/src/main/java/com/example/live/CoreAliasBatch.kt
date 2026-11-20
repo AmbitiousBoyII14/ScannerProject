@@ -31,17 +31,34 @@ internal class CoreAliasTemplate(raw:String) : AliasTemplate {
     }
 }
 
-/** Only the account hostname changes. Pin comes from the canonical SNI's existing trust record. */
-internal class SshAccountTemplate(raw:String,pin:String) : AliasTemplate {
-    private val draft=JSONObject(raw)
+/** One canonical endpoint and one SSH identity; template only routing fields, never credentials. */
+internal class SshAccountTemplate(raw:String) : AliasTemplate {
+    private val draft=JSONObject(raw).apply{remove("hostKey")}
+    private val marker="\$\$"
+    private val fields=listOf("host","sni","payload")
     override val base:Profile
     init {
-        require(raw.length<=32768 && draft.getString("host")=="\$\$" && draft.getString("mode")=="SSH TLS")
-        val sni=draft.getString("sni");require(sni.isNotBlank())
-        draft.put("hostKey",pin);base=profile(sni)
+        require(raw.length<=32768 && draft.optString("mode") in setOf("SSH TLS","SSH WS TLS","SSH HTTP TLS","SSH WS+Raw TLS"))
+        require(fields.any{marker in draft.optString(it)})
+        val host=draft.getString("host");val sni=draft.optString("sni")
+        require(marker !in host || host==marker)
+        val canonical=if(marker in host)sni else host
+        require(canonical.isNotBlank() && marker !in canonical)
+        base=expand(canonical)
     }
-    private fun profile(host:String)=Profile.read(JSONObject(draft.toString()).put("host",host).toString())
-    override fun approved(alias:String,certNames:Set<String>):Profile? = if(alias in certNames)profile(alias) else null
+    private fun expand(name:String):Profile {
+        val row=JSONObject(draft.toString());fields.forEach{k->if(row.has(k))row.put(k,row.getString(k).replace(marker,name))};return Profile.read(row.toString(),forDiscovery=true)
+    }
+    override fun approved(alias:String,certNames:Set<String>):Profile? {
+        if(alias !in certNames)return null
+        val row=runCatching{expand(alias)}.getOrNull()?:return null
+        val peer=row.sni.ifEmpty{row.host};if(peer !in certNames || row.host !in certNames)return null
+        if(row.mode!="SSH TLS"){
+            val authority=GatewayRequest.parse(row.payload,peer,row.port,row.path," WS" in row.mode).authority
+            if(authority.substringBefore(':').lowercase() !in certNames)return null
+        }
+        return row
+    }
 }
 
 internal fun AliasTemplate.certificateNames(ip:InetAddress,ms:Int):Set<String> = Socket().use { tcp ->

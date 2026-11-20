@@ -4,7 +4,7 @@ from pathlib import Path
 import base64, hashlib, sys
 root=Path(__file__).resolve().parents[1]
 live=root/'scanner-vpn/app/src/main/assets/live'; web=root/'web-preview'
-html=(live/'index.html').read_text().replace('<script src="core-editor.js">','<script src="app.js"></script><script src="core-editor.js">').replace('ANDROID 1.18','1.18 BROWSER SIMULATION').replace('</small><div class="scrim"','</small><p id="previewMessage" role="status"></p><div class="scrim"')
+html=(live/'index.html').read_text().replace('<script src="core-editor.js">','<script src="app.js"></script><script src="core-editor.js">').replace('ANDROID 1.19','1.19 BROWSER SIMULATION').replace('</small><div class="scrim"','</small><p id="previewMessage" role="status"></p><div class="scrim"')
 css=(live/'style.css').read_text()+'\n#previewMessage{margin:0;text-align:center;font-size:12px;color:var(--muted)}\n'
 scripts={'app.js':(web/'app.js').read_text(),**{n:(live/n).read_text() for n in ('core-editor.js','ui.js')}}
 outputs={web/'index.html':html,web/'style.css':css,**{web/n:s for n,s in scripts.items() if n!='app.js'}}
