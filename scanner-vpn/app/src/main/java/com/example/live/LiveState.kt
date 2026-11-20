@@ -31,14 +31,43 @@ internal object LiveState {
     @Synchronized fun log(tag:String,text:String,batch:Boolean=false){val list=if(batch)checks else logs;val stamp=SimpleDateFormat("HH:mm:ss",Locale.US).format(Date());if(list.size>=500)list.removeFirst();list.addLast("$stamp  $tag  $text");DebugFile.event("${if(batch) "BATCH" else "VPN"}  $tag  $text")}
     @Synchronized fun sessionLogText()=logs.joinToString("\n")
     @Synchronized fun clearSessionLog(){logs.clear()}
-    @Synchronized fun snapshot()=obj("webBatch" to (webBatch?.snapshot() ?: org.json.JSONObject.NULL),"debugFile" to DebugFile.status,"state" to status,"activeDns" to (active()?.dns?:""),"activeSni" to (active()?.sni?:""),"activeDns2" to (active()?.dns2?:""),"activeUdp" to (active()?.udpGw?:""),"activePayload" to (active()?.payload?:""),"activePath" to (active()?.path?:"/"),"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"results" to arr(*outcomes.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
+    @Synchronized fun snapshot()=obj("aliasStatus" to aliasStatus,"webBatch" to (webBatch?.snapshot() ?: org.json.JSONObject.NULL),"debugFile" to DebugFile.status,"state" to status,"activeDns" to (active()?.dns?:""),"activeSni" to (active()?.sni?:""),"activeDns2" to (active()?.dns2?:""),"activeUdp" to (active()?.udpGw?:""),"activePayload" to (active()?.payload?:""),"activePath" to (active()?.path?:"/"),"active" to chosen,"profiles" to arr(*profiles.keys.toTypedArray()),"log" to arr(*logs.toTypedArray()),"results" to arr(*outcomes.toTypedArray()),"total" to total,"completed" to completed,"checks" to arr(*checks.toTypedArray()),"batch" to batchRunning,"latency" to ms,"up" to up,"down" to down,"elapsed" to if(since>0)(SystemClock.elapsedRealtime()-since)/1000 else 0).toString()
     private var webBatch:WebsiteBatch?=null
+    @Volatile private var aliasStatus=""
+    @Synchronized fun aliases(context:Context,raw:String,text:String):String {
+        if(!editable())return "Stop the current tunnel or batch first."
+        val t=runCatching{CoreAliasTemplate(raw)}.getOrElse{return "Set up a TLS VLESS, VMess or Trojan profile with a fixed server and \$\$ in SNI, WS Host or WS path."}
+        val input=runCatching{WebsiteInput.hosts(text)}.getOrElse{return "Use a domain list up to 1 MiB."}
+        if(input.hosts.isEmpty() || input.skipped!=0)return "Enter bare domain names, one per line (no port or URL)."
+        val policy=CheckPolicy.read(context).copy(auto=true,retries=2);val file=java.io.File(context.filesDir,"output.txt")
+        total=input.hosts.size;completed=0;outcomes.clear();checks.clear();webBatch=null;stopBatch=false;batchRunning=true;aliasStatus="Checking gateway certificate"
+        executor.execute {
+            val parts=listOf("Connected","Failed","Skipped").associateWith{java.io.File(context.cacheDir,"alias-$it.txt")};val start=SystemClock.elapsedRealtime();var connected=0;var failed=0;var skipped=0
+            fun result(tag:String,host:String,detail:String){
+                parts.getValue(tag).appendText("$host\t$detail\n");synchronized(this){if(outcomes.size>=80)outcomes.removeAt(0);outcomes.add("${tag.uppercase()}  $host  $detail");completed++;log(tag.uppercase(),"$host · $detail",true)}
+            }
+            val tmp=java.io.File(context.filesDir,"alias-output.tmp")
+            try{
+                parts.values.forEach{it.writeText("")};val ip=NetworkChecks.resolve(t.base.host,policy.ms);val names=t.certificateNames(ip,policy.ms);val edge="${ip.hostAddress} · ${CdnRanges.label(ip)}"
+                Engine.init(context)
+                for(host in input.hosts){if(stopBatch)break
+                    val row=t.approved(host,names);if(row==null){skipped++;result("Skipped",host,"Not an explicit gateway certificate name (SNI / WS Host / list entry).");continue}
+                    var attempt=0
+                    try{val delay=policy.run({stopBatch},{},{attempt++;val eta=if(completed==0)"estimating" else "${(SystemClock.elapsedRealtime()-start)/1000*(total-completed)/completed}s";aliasStatus="${completed+1}/$total · $host · attempt $attempt/3 · Connected $connected · Failed $failed · ETA $eta";log("ATTEMPT","$host · $attempt/3",true)
+                        val ms=Libv2ray.measureOutboundDelay(row.config(ip.hostAddress!!,seconds=policy.seconds),CHECK_URL);check(ms>=0);ms});if(stopBatch)break;connected++;result("Connected",host,"HTTPS through ${row.mode} · $delay ms · $edge")
+                    }catch(e:Exception){if(stopBatch)break;failed++;result("Failed",host,failureReason(e,"V2ray outbound did not verify traffic.")+" · $edge")}
+                }
+                val summary="${if(stopBatch)"Stopped" else "Complete"} · $completed/$total · Connected $connected · Failed $failed · Skipped $skipped"
+                tmp.outputStream().buffered().use{out->out.write(("V2ray TLS alias batch · $summary\nGateway: ${t.base.host}:${t.base.port} · $edge\n").toByteArray());parts.forEach{(group,f)->out.write("\n[$group]\n".toByteArray());f.inputStream().use{it.copyTo(out)}}};check(tmp.renameTo(file));aliasStatus="$summary · output.txt saved"
+            }catch(e:Exception){aliasStatus="Batch stopped: "+failureReason(e,"Could not verify the fixed gateway certificate, build a row or save the report.");log("FAILED",aliasStatus,true)}finally{parts.values.forEach{it.delete()};tmp.delete();batchRunning=false}
+        };return ""
+    }
     @Synchronized fun websites(context:Context,text:String,template:String):String {
         if(!editable())return "Stop the current tunnel or batch first."
         val path=runCatching{WebsiteInput.path(template.trim())}.getOrElse{return "Use https://\$\$/ followed by an optional path (no port, credentials, query or fragment)."}
         val input=runCatching{WebsiteInput.hosts(text)}.getOrElse{return "Use a UTF-8 list up to 1 MiB."}
         if(input.hosts.isEmpty())return "No valid domain lines found. Enter one domain per line without a URL or port."
-        val batch=WebsiteBatch(input.hosts,path,input.skipped);webBatch=batch;stopBatch=false;batchRunning=true
+        aliasStatus="";val batch=WebsiteBatch(input.hosts,path,input.skipped);webBatch=batch;stopBatch=false;batchRunning=true
         checks.clear();outcomes.clear();total=0;completed=0;val policy=CheckPolicy.read(context)
         executor.execute{try{batch.run(context.filesDir,policy){stopBatch}}finally{batchRunning=false}};return ""
     }
@@ -53,7 +82,7 @@ internal object LiveState {
             }.distinct()
         } else (if(all)profiles.values.toList() else listOfNotNull(active())).map{Job(it.host,it.port,it)}
         if(jobs.isEmpty())return false
-        webBatch=null;val policy=CheckPolicy.read(context);total=jobs.size;completed=0;outcomes.clear();checks.clear();stopBatch=false;batchRunning=true
+        aliasStatus="";webBatch=null;val policy=CheckPolicy.read(context);total=jobs.size;completed=0;outcomes.clear();checks.clear();stopBatch=false;batchRunning=true
         executor.execute {try{for(job in jobs){if(stopBatch)break
             val p=job.profile;log("START","${job.endpoint} · ${p?.mode?:"TLS reachability"}",true)
             var network="DNS unresolved"

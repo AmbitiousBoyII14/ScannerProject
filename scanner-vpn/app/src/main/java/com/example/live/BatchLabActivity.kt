@@ -30,7 +30,7 @@ class BatchLabActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?) = true
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest) =
-                WebResourceResponse("text/plain", "UTF-8", null)
+                if (request.url.toString()=="https://preview.invalid/lab.html") WebResourceResponse("text/html","UTF-8",assets.open("batch-lab.html")) else WebResourceResponse("text/plain", "UTF-8", null)
         }
         web.addJavascriptInterface(Files(), "PreviewFiles")
         val frame = android.widget.FrameLayout(this)
@@ -42,7 +42,7 @@ class BatchLabActivity : Activity() {
             i
         }
         setContentView(frame)
-        web.loadDataWithBaseURL("https://preview.invalid/", assets.open("batch-lab.html").bufferedReader().use { it.readText() }, "text/html", "utf-8", null)
+        web.loadUrl("https://preview.invalid/lab.html")
     }
 
     private fun js(code: String) { runOnUiThread { if (!isDestroyed) web.evaluateJavascript(code, null) } }

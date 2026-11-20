@@ -9,7 +9,7 @@ class LiveProfileTest {
         val dir=System.getenv("XRAY_TEST_DIR");org.junit.Assume.assumeNotNull(dir)
         for((i,mode) in listOf("VLESS TLS","VLESS WS TLS").withIndex()){
             val raw=obj("mode" to mode,"host" to "127.0.0.1","sni" to "localhost","wsHost" to (if(i==1)"route.example.test" else ""),"port" to (22262+i),"secret" to "00000000-0000-4000-8000-000000000001","path" to "/fixture").toString()
-            val cfg=JSONObject(Profile.read(raw).config("127.0.0.1"));java.io.File(dir,"client$i.json").writeText(cfg.toString())
+            val template=CoreAliasTemplate(JSONObject(raw).put("sni","\$\$").toString());val row=requireNotNull(template.approved("localhost",setOf("localhost","route.example.test")));val cfg=JSONObject(row.config("127.0.0.1"));java.io.File(dir,"client$i.json").writeText(cfg.toString())
         }
     }
     @Test fun separateDialHostAndTlsName(){
